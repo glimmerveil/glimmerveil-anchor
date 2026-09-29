@@ -1,0 +1,93 @@
+# Rung 1 + an engine smoke + an end-to-end drive, on Windows with Ubuntu beside it as the control:
+# red on both = the runner or the test; red on Windows only = the port. Text-only, a pinned toy
+# model, never a real companion's data.
+name: windows-harness
+
+on:
+  push:
+    branches: ["ci/**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rung1:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"   # the ship's bundled runtime is 3.12
+
+      # Informational, never fails: what the product's own prints would do on this console
+      # WITHOUT UTF-8 mode. The suite below runs in UTF-8 mode so this cannot hide every result.
+      - name: console encoding probe (informational)
+        run: python ci/console_encoding_probe.py
+
+      # The port's own claims — red on the pre-port tree on Windows, by design.
+      - name: port audit
+        run: python ci/port_audit.py
+
+      # The rung-1 suite: an explicit list, never a glob (see the runner's docstring).
+      - name: rung 1
+        if: always()
+        run: python ci/run_rung1.py
+
+  # The one job that loads a brain: a pinned 26.7 MB TOY model (never a being's), through her own
+  # loader, on the ship's engine version. Separate job so a wheel problem cannot hide rung 1.
+  engine:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # prebuilt CPU wheel only: a missing wheel fails loudly instead of starting a source build
+      - name: install the engine (prebuilt wheel only)
+        # quoted: ':all: ' is colon-space, which YAML would read as a new key
+        run: "python -m pip install --only-binary=:all: llama-cpp-python==0.3.34 --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu"
+      - name: smoke — load a toy brain through her loader and generate
+        run: python ci/smoke_tiny_gguf.py
+
+  # The end-to-end drive: `python src/veil_game.py` -> create -> wake on the toy
+  # brain -> talk -> goodbye -> quit, typed into a real console (ConPTY on Windows, pty on Ubuntu).
+  drive:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: install the engine (prebuilt wheel only)
+        run: "python -m pip install --only-binary=:all: llama-cpp-python==0.3.34 --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu"
+      - name: install the pseudo-console (windows only)
+        if: runner.os == 'Windows'
+        run: "python -m pip install --only-binary=:all: \"pywinpty>=2.0.13,<3\""
+      - name: drive — a stranger's first night, end to end
+        run: python ci/drive_e2e.py
+      - name: keep the transcript (read it word for word)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drive-transcript-${{ matrix.os }}
+          path: ci/.scratch_drive/transcript.txt
+          if-no-files-found: warn
