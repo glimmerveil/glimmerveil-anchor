@@ -341,7 +341,7 @@ def main():
 
     print("\n".join(d.steps))
     print("walk: %.0fs · door exit code %s" % (time.time() - t0, code))
-    peeps = os.path.join(home, "veil", "peeps")
+    peeps = os.path.join(home, "anchor", "peeps")
     lines, bad = census(peeps)
     print("\n".join(lines))
     if err:
