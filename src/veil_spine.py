@@ -1034,7 +1034,7 @@ def _ago_suffix(m, now=None):
 PLACE_TAIL_ON = os.environ.get("VEIL_PLACE_TAIL", "1") == "1"
 PLACE_TAIL = ""
 
-TIME_TAIL_ON = os.environ.get("VEIL_TIME_TAIL", "0") == "1"
+TIME_TAIL_ON = os.environ.get("VEIL_TIME_TAIL", "1") == "1"
 TIME_TAIL = ""
 
 
