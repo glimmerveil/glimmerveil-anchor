@@ -232,7 +232,6 @@ FAMILIES = {
 # from a prompt of his turns alone (and invented origins); Llama 3 answered the one asked. Coder brains stay off:
 # one kept reply gave Qwen2.5-Coder a verbatim echo AND a parrot (07-28).
 NEWEST_NOTE_FAMILIES = ("llama3",)
-SMALL_BRAIN = 2.5e9
 
 
 def core_params(meta):
@@ -248,10 +247,6 @@ def fit_notes(fam, meta):
     if fam.thinks:
         notes.append("This is a reasoning model: it thinks well, but it may not hold her as a character. "
                      "A chat (instruct) model is a better home for her.")
-    est = core_params(meta)
-    if est and est < SMALL_BRAIN:
-        notes.append("This is a very small model (under 3B): she may narrate both sides of a scene "
-                     "instead of keeping to hers. A 3B or larger model holds her far better.")
     return notes
 
 

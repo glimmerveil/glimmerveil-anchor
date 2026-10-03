@@ -2,8 +2,9 @@
 """Rung 1 — the door says plainly when a brain is a poor home for her.
 
 Deck rung 3, 2026-10-03: DeepSeek-R1-Distill (a reasoning model) recited her own place block and said "My name is
-[Your Name]"; Llama 3.2-1B wrote his part of every scene, with or without her kept reply. Both RUN — so the door says
-so, once, beside the brain format. Nothing is refused.
+[Your Name]"; Llama 3.2-1B wrote his part of every scene — and was NOT flagged after all: it is byte-identical to Pixie Prime's
+brain (~/pixie.gguf), and she holds herself on it. Size is not the limit; the prompt shape is. Only the reasoning
+model gets a note. Nothing is refused.
 """
 import os
 import struct
@@ -51,7 +52,7 @@ try:
     print("\nRUNG 1 — THE DOOR NAMES A POOR HOME, ONCE, AND REFUSES NOTHING")
     print("=" * 74)
     n = notes_for(gguf("llama-1b.gguf", "llama", 16, 2048, LLAMA))
-    check("Llama 3.2-1B shape (16 x 2048) -> small", len(n) == 1 and "very small" in n[0], n)
+    check("Llama 3.2-1B shape (16 x 2048) -> nothing (Pixie Prime runs this brain)", n == [], n)
     n = notes_for(gguf("llama-8b.gguf", "llama", 32, 4096, LLAMA))
     check("Llama 3.1-8B shape (32 x 4096) -> nothing", n == [], n)
     n = notes_for(gguf("gemma-4b.gguf", "gemma3", 34, 2560, "<start_of_turn>user"))
@@ -69,5 +70,5 @@ finally:
 if fails:
     print("\n  %d case(s) failed" % len(fails))
     sys.exit(1)
-print("\n  PASS  small and reasoning brains are named; the rest are left alone")
+print("\n  PASS  a reasoning brain is named; the rest are left alone")
 sys.exit(0)
