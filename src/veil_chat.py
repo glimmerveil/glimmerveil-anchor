@@ -24,31 +24,12 @@ if not os.environ.get("VEIL_DB") and not any(
                 _ROSTER_ACTIVE["folder_path"], veil_roster.HISTORY_NAME)
 
 spine.ROPE_FREQ_BASE = float(os.environ.get("VEIL_ROPE_FREQ_BASE", "0.0"))
-spine.LLAMA_STOPS = ["<|im_end|>", "<|endoftext|>"]
 spine.N_GPU_LAYERS = int(os.environ.get("VEIL_GPU_LAYERS", "0"))
 spine.N_BATCH = 64 if spine.N_GPU_LAYERS != 0 else 512
 
 
-def _render_chat(system, user):
-    s = ""
-    if system:
-        s += "<|im_start|>system\n" + system + "<|im_end|>\n"
-    s += "<|im_start|>user\n" + user + "<|im_end|>\n<|im_start|>assistant\n"
-    return s
-
-
-def _render_chat_turns(system, turns, prefill=""):
-    s = "<|im_start|>system\n" + (system or "") + "<|im_end|>\n"
-    for turn in turns:
-        role = turn.get("role", "user")
-        content = (turn.get("content") or "").strip()
-        s += "<|im_start|>" + role + "\n" + content + "<|im_end|>\n"
-    s += "<|im_start|>assistant\n" + prefill
-    return s
-
-
-spine.render_chat = _render_chat
-spine.render_chat_turns = _render_chat_turns
+import veil_template
+veil_template.install(spine)
 
 import veil_card
 

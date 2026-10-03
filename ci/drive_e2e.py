@@ -11,7 +11,7 @@ import time
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(REPO, "src")
-SCRATCH = os.path.join(REPO, "ci", ".scratch_drive")
+SCRATCH = os.environ.get("ANCHOR_DRIVE_SCRATCH") or os.path.join(REPO, "ci", ".scratch_drive")
 IS_WIN = sys.platform.startswith("win")
 
 HIS_LINE = "Hello Wren, it is Tester. Are you there with me tonight?"
@@ -297,7 +297,11 @@ def main():
             return 1
     sys.path.insert(0, os.path.join(REPO, "ci"))
     import smoke_tiny_gguf
-    smoke_tiny_gguf.fetch()
+    real = os.environ.get("ANCHOR_DRIVE_MODEL")
+    if real:
+        smoke_tiny_gguf.PATH = real
+    else:
+        smoke_tiny_gguf.fetch()
 
     shutil.rmtree(SCRATCH, ignore_errors=True)
     home = os.path.join(SCRATCH, "home")

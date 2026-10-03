@@ -48,6 +48,7 @@ TESTS = [
     "test_veil_sleep_together.py",
     "test_veil_snapshot_rolling.py",
     "test_veil_soft_landing.py",
+    "test_veil_template.py",
     "test_veil_voice_toggle.py",
     "test_veil_wake_seed.py",
     "test_veil_wardrobe.py",
