@@ -366,6 +366,11 @@ def main():
     print("\n".join(d.steps))
     print("walk: %.0fs · door exit code %s" % (time.time() - t0, code))
     peeps = os.path.join(home, "anchor", "peeps")
+    if os.environ.get("ANCHOR_DRIVE_LAUNCHER", "").lower() == "forge.bat":
+        if os.path.isdir(peeps) and os.listdir(peeps):
+            print("FAIL the Forge wrote into Anchor's home: %s" % peeps)
+            return 1
+        peeps = os.path.join(env["LOCALAPPDATA"], "Glimmerveil Forge for Windows", "peeps")
     lines, bad = census(peeps)
     print("\n".join(lines))
     if err:
