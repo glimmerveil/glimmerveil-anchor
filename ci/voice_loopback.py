@@ -11,6 +11,20 @@ LINE = "Hello there. Can you hear me tonight? The rain is soft on the window."
 WANT = {"hello", "hear", "tonight", "rain", "window"}
 
 
+def _as_mic_wav(path, rate=16000):
+    import numpy as np
+    import soundfile as sf
+    data, src = sf.read(path, dtype="float32", always_2d=True)
+    mono = data.mean(axis=1)
+    if src != rate:
+        n = int(round(len(mono) * rate / src))
+        mono = np.interp(np.linspace(0, len(mono) - 1, n), np.arange(len(mono)), mono)
+    out = os.path.splitext(path)[0] + "_16k.wav"
+    sf.write(out, mono, rate, subtype="PCM_16")
+    print("as the mic hands it over: %d Hz -> %d Hz mono" % (src, rate))
+    return out
+
+
 def main():
     import veil_voice as V
     print("voice dir: %s" % V.VOICE_DIR)
@@ -31,6 +45,8 @@ def main():
         print("FAIL her voice made no audio")
         return 1
     print("spoke %r -> %d bytes of audio in %.1fs" % (LINE, os.path.getsize(wav), time.time() - t0))
+    # her mouth speaks at 24 kHz; every recorder hands the ear 16 kHz mono, so give it what a mic would
+    wav = _as_mic_wav(wav)
     t0 = time.time()
     heard = V._transcribe(wav) or ""
     print("heard back: %r  (%.1fs)" % (heard, time.time() - t0))
