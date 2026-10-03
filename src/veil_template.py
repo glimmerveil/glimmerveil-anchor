@@ -224,6 +224,25 @@ FAMILIES = {
 }
 
 
+# She keeps her newest reply as ONE assistant turn unless her brain answers the newest note on its own.
+# Measured 10-03 on a stranger's first night: Qwen2.5 · Qwen3 · Gemma · Mistral re-answered every earlier question
+# from a prompt of his turns alone (and invented origins); Llama 3 answered the one asked. Coder brains stay off:
+# one kept reply gave Qwen2.5-Coder a verbatim echo AND a parrot (07-28).
+NEWEST_NOTE_FAMILIES = ("llama3",)
+
+
+def keeps_last_for(path):
+    fam = family_for(path)[0]
+    if fam.key in NEWEST_NOTE_FAMILIES:
+        return False
+    names = [os.path.basename(str(path or ""))]
+    try:
+        names.append(gguf_meta(path).get("general.name") or "")
+    except Exception:
+        pass
+    return not any("coder" in n.lower() for n in names)
+
+
 def detect(meta):
     tpl = meta.get("tokenizer.chat_template") or ""
     if "<|im_start|>" in tpl:
@@ -372,6 +391,7 @@ def install(spine, say=print):
                     "VEIL_CHAT_FORMAT to one of: %s]" % ", ".join(FAMILIES))
         return fam
 
+    spine.FAMILY_KEEPS_LAST = lambda: keeps_last_for(spine.MODEL_PATH)
     spine.render_chat = lambda system, user: current().render_chat(system, user)
     spine.render_chat_turns = lambda system, turns, prefill="": current().render_chat_turns(system, turns, prefill)
     orig_get = spine.get_llm

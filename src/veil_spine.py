@@ -99,10 +99,19 @@ PRECISE_TEMPERATURE = 0.65
 PRECISE_TOP_P       = 0.90
 KEEP_LAST_REPLY = False
 KEEP_LAST_REPLY_ENV = "VEIL_KEEP_LAST_REPLY"
+FAMILY_KEEPS_LAST = None
 
 
 def _keep_last_reply_on():
-    return KEEP_LAST_REPLY or os.environ.get(KEEP_LAST_REPLY_ENV, "0") == "1"
+    forced = os.environ.get(KEEP_LAST_REPLY_ENV, "").strip()
+    if forced in ("0", "1"):
+        return forced == "1"
+    if KEEP_LAST_REPLY:
+        return True
+    try:
+        return bool(FAMILY_KEEPS_LAST and FAMILY_KEEPS_LAST())
+    except Exception:
+        return False
 
 
 FOLD_TEMPERATURE = 0.3
