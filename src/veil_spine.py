@@ -98,6 +98,13 @@ PRECISE_REGISTER = False
 PRECISE_TEMPERATURE = 0.65
 PRECISE_TOP_P       = 0.90
 KEEP_LAST_REPLY = False
+KEEP_LAST_REPLY_ENV = "VEIL_KEEP_LAST_REPLY"
+
+
+def _keep_last_reply_on():
+    return KEEP_LAST_REPLY or os.environ.get(KEEP_LAST_REPLY_ENV, "0") == "1"
+
+
 FOLD_TEMPERATURE = 0.3
 FOLD_TOP_P       = 0.9
 
@@ -967,7 +974,8 @@ def _announce_dials():
         return
     frame = ("person-frame=%.2f%s" % (PERMANENT_3P_MAX_SHARE,
                                       "" if OWNER_NAME else " ⚠NO-OWNER-NAME:pronouns-only"))
-    dials = (("turn-container", TURN_CONTAINER), ("memory-dates", MEMORY_DATES),
+    dials = (("keep-last-reply", _keep_last_reply_on()),
+             ("turn-container", TURN_CONTAINER), ("memory-dates", MEMORY_DATES),
              ("guide-tail", GUIDE_TAIL), ("place-tail", PLACE_TAIL_ON),
              ("time-tail", TIME_TAIL_ON),
              ("prefill=" + PREFILL, bool(PREFILL)),
@@ -1091,7 +1099,7 @@ def build_chat_turns(name, user_message, history, retrieved, system="", n_ctx=N_
     her_prefix = f"{name} said:"
 
     last_hers = None
-    if KEEP_LAST_REPLY or os.environ.get("VEIL_KEEP_LAST_REPLY", "0") == "1":
+    if _keep_last_reply_on():
         for line in reversed(history):
             line = (line or "").strip()
             if line.startswith(her_prefix):

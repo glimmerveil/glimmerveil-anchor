@@ -7,7 +7,7 @@ os.environ.update({k: v for k, v in (
     ("VEIL_DIARY_ROWS_PER_TURN", "2"), ("VEIL_FOLD_TO_DIARY", "1"),
     ("VEIL_FOLD_REFLECTION", "1"), ("VEIL_TURN_CONTAINER", "1"), ("VEIL_GUIDE_TAIL", "1"),
     ("VEIL_MEMORY_DATES", "1"), ("VEIL_PREFILL", "*"),
-    ("VEIL_TIME_TAIL", "1"))})
+    ("VEIL_TIME_TAIL", "1"), ("VEIL_KEEP_LAST_REPLY", "1"))})
 import veil_spine as spine
 
 tree = ast.parse(open(os.path.join(SRC, "veil_spine.py")).read())
