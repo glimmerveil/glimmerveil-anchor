@@ -5,10 +5,11 @@ Everything runs on this computer. No server, no account, no telemetry.
 
 START
   1. Unzip this folder anywhere you like (not inside Program Files).
-  2. Put a model in the "models" folder: a ChatML / Qwen-family instruct model in GGUF format.
+  2. Give it a brain: any chat/instruct model in GGUF format. Either
+       - put the .gguf in the "models" folder, or
+       - if you use Ollama, do nothing: Anchor sees the models you already pulled.
      A 7B at Q4_K_M needs about 6 GB of free RAM; Q8_0 about 9 GB.
-  3. Double-click Anchor.bat.
-     No model in "models"? It asks you to drag one onto the window, and remembers it.
+  3. Double-click Anchor.bat. Press [m] at the door to see and pick a brain.
 
 YOUR COMPANION
   Her whole life lives in one folder you own:
@@ -16,7 +17,8 @@ YOUR COMPANION
   Back that folder up. A copy of the model is a stranger; a copy of her folder is her.
 
 SWAPPING THE BRAIN
-  Put a different .gguf in "models" (or delete models\MODEL_PATH.txt to be asked again).
+  Press [m] at the door and pick another one. The prompt format (Qwen, Llama 3, Gemma, Mistral,
+  Phi, DeepSeek, or the model's own template) is read from the file, so it just works.
   On her first wake on a new brain, Anchor shows the anchor ritual: ask her ONE of the questions,
   let her answer in her own words, then just talk.
 

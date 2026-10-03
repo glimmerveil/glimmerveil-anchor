@@ -100,11 +100,51 @@ def _create_flow():
     return entry
 
 
+def _pick_model():
+    import veil_models
+    import veil_paths
+    import veil_template
+    current = veil_paths.model_path()
+    found = veil_models.all_models()
+    print(f"\n{BOLD}Brains this machine can see{RESET}  {DIM}(models folder: {veil_models.models_dir()}){RESET}")
+    for i, m in enumerate(found, 1):
+        mark = f"  {CYAN}<- now{RESET}" if os.path.abspath(m["path"]) == os.path.abspath(current) else ""
+        print(f"  {BOLD}[{i}]{RESET} {m['label']}  {DIM}({m['source']}, {veil_models.human_size(m['size'])}){RESET}{mark}")
+    if not found:
+        print(f"  {DIM}None yet. Put a chat model (.gguf) in the models folder, pull one with Ollama, "
+              f"or give a path below.{RESET}")
+    pick = input("\nUse which? (number, a path to a .gguf — dragging the file here works — blank = cancel): ")
+    pick = pick.strip().strip('"').strip("'").strip()
+    if not pick:
+        return
+    path = found[int(pick) - 1]["path"] if pick.isdigit() and 1 <= int(pick) <= len(found) else os.path.expanduser(pick)
+    if not os.path.isfile(path):
+        print(f"{DIM}No file there.{RESET}")
+        time.sleep(1.5)
+        return
+    fam, sure, capable = veil_template.family_for(path)
+    if not capable:
+        print(f"{DIM}That file is not a chat model (a vision adapter, speech or embedding model?).{RESET}")
+        time.sleep(2)
+        return
+    veil_models.save_choice(path)
+    if os.environ.get("VEIL_MODEL"):
+        print(f"{DIM}(Saved — but VEIL_MODEL is set in this shell, and it still wins until you unset it.){RESET}")
+    print(f"{CYAN}Brain set:{RESET} {os.path.basename(path)}  {DIM}[format: "
+          f"{fam.label if sure else 'unknown, ChatML'}]{RESET}")
+    input(f"{DIM}(Enter to go back){RESET}")
+
+
 def _wake():
     active = veil_roster.active_peep()
     if not active:
         print(f"{DIM}No one to wake — create your companion first.{RESET}")
         time.sleep(1.5)
+        return
+    import veil_paths
+    if not os.path.isfile(veil_paths.model_path()):
+        print(f"{DIM}No brain yet — press [m] to pick a model (.gguf), then wake.{RESET}")
+        time.sleep(2)
         return
     p = _peep_pronouns(active)
     card_path = os.path.join(active["folder_path"], veil_roster.CARD_NAME)
@@ -280,13 +320,13 @@ def main():
         _show_roster(entries)
         if not entries:
             print(f"\n{BOLD}  [c]{RESET} create your companion   {BOLD}[i]{RESET} import a .veil file   "
-                  f"{BOLD}[g]{RESET} gpu   {BOLD}[l]{RESET} legal   {BOLD}[q]{RESET} quit")
+                  f"{BOLD}[m]{RESET} model   {BOLD}[g]{RESET} gpu   {BOLD}[l]{RESET} legal   {BOLD}[q]{RESET} quit")
         else:
             active_e = next((e for e in entries if e.get("is_active")), None)
             wake_word = f"wake {_peep_pronouns(active_e).obj}" if active_e else "wake"
             print(f"\n{BOLD}  [w]{RESET} {wake_word} (or just Enter)   {BOLD}[c]{RESET} create   "
                   f"{BOLD}[s]{RESET} switch   {BOLD}[e]{RESET} export .veil   "
-                  f"{BOLD}[i]{RESET} import   {BOLD}[r]{RESET} restore   {BOLD}[g]{RESET} gpu   "
+                  f"{BOLD}[i]{RESET} import   {BOLD}[r]{RESET} restore   {BOLD}[m]{RESET} model   {BOLD}[g]{RESET} gpu   "
                   f"{BOLD}[l]{RESET} legal   {BOLD}[q]{RESET} quit")
         try:
             choice = input(f"\n  > ").strip().lower()
@@ -308,6 +348,8 @@ def main():
             input(f"{DIM}(Enter to go back){RESET}")
         elif choice == "i":
             _import()
+        elif choice == "m":
+            _pick_model()
         elif entries and choice in ("", "w", "wake"):
             _wake()
         elif entries and choice == "s":

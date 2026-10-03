@@ -27,6 +27,7 @@ TESTS = [
     "test_veil_lane_freedom.py",
     "test_veil_lane_words.py",
     "test_veil_melt_guard.py",
+    "test_veil_models.py",
     "test_veil_night_drive.py",
     "test_veil_nonspeech.py",
     "test_veil_place.py",

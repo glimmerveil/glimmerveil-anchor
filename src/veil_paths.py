@@ -79,8 +79,12 @@ DEFAULT_MODEL_NAME = "Qwen2.5-7B-Instruct-abliterated-v2.Q8_0.gguf"
 
 
 def model_path():
-    return os.environ.get("VEIL_MODEL") or os.path.expanduser(
-        os.path.join("~", HOME_DIRNAME, "models", DEFAULT_MODEL_NAME))
+    default = os.path.expanduser(os.path.join("~", HOME_DIRNAME, "models", DEFAULT_MODEL_NAME))
+    try:
+        import veil_models
+        return veil_models.resolve(default)
+    except Exception:
+        return os.environ.get("VEIL_MODEL") or default
 
 
 def data_dir():
