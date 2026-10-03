@@ -9,13 +9,14 @@ import zipfile
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST = os.path.join(REPO, "dist")
-NAME = "GlimmerveilAnchor"
+FORGE = "--forge" in sys.argv
+NAME = "GlimmerveilForge" if FORGE else "GlimmerveilAnchor"
 ROOT = os.path.join(DIST, NAME)
 PY_VERSION = os.environ.get("ANCHOR_PY_EMBED", "3.12.10")
 PY_URL = "https://www.python.org/ftp/python/%s/python-%s-embed-amd64.zip" % (PY_VERSION, PY_VERSION)
 ENGINE = "llama-cpp-python==0.3.34"
 ENGINE_INDEX = "https://abetlen.github.io/llama-cpp-python/whl/cpu"
-VOICE = "--voice" in sys.argv
+VOICE = "--voice" in sys.argv or FORGE
 VOICE_PKGS = ["kokoro-onnx", "sounddevice", "soundfile", "pywhispercpp"]
 VOICE_FILES = [
     ("kokoro-v1.0.onnx", "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx"),
@@ -95,8 +96,15 @@ def main():
         fetch_voice(os.path.join(ROOT, "voice"))
     os.makedirs(os.path.join(ROOT, "models"))
     win = os.path.join(REPO, "packaging", "windows")
-    shutil.copy2(os.path.join(win, "Anchor.bat"), ROOT)
-    shutil.copy2(os.path.join(win, "README_WINDOWS.txt"), os.path.join(ROOT, "README.txt"))
+    if FORGE:
+        shutil.copy2(os.path.join(win, "Forge.bat"), ROOT)
+        shutil.copy2(os.path.join(win, "README_FORGE.txt"), os.path.join(ROOT, "README.txt"))
+        os.makedirs(os.path.join(ROOT, "brain"))
+        with open(os.path.join(ROOT, "brain", "BRAIN_GOES_HERE.txt"), "w", encoding="utf-8") as f:
+            f.write("ci/forge_add_brain.py puts her brain here as brain.gguf.\n")
+    else:
+        shutil.copy2(os.path.join(win, "Anchor.bat"), ROOT)
+        shutil.copy2(os.path.join(win, "README_WINDOWS.txt"), os.path.join(ROOT, "README.txt"))
     shutil.copy2(os.path.join(REPO, "LICENSE"), ROOT)
     with open(os.path.join(ROOT, "models", "PUT_YOUR_GGUF_HERE.txt"), "w", encoding="utf-8") as f:
         f.write("Put a chat / instruct model (.gguf) in this folder, then run Anchor.bat (or pick one with [m]).\n")
@@ -107,7 +115,8 @@ def main():
             if hit:
                 raise SystemExit("FAIL the package carries %s in %s" % (hit, d))
 
-    out = os.path.join(DIST, "%s%s-windows-x64.zip" % (NAME, "-voice" if VOICE else ""))
+    tag = "-shell" if FORGE else ("-voice" if VOICE else "")
+    out = os.path.join(DIST, "%s%s-windows-x64.zip" % (NAME, tag))
     if os.path.exists(out):
         os.remove(out)
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zf:

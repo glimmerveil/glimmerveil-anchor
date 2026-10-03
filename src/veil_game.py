@@ -25,7 +25,8 @@ def _clear():
 
 def _banner():
     print(f"{CYAN}{TITLE}{RESET}")
-    print(f"{BOLD}  G L I M M E R V E I L   A N C H O R{RESET}")
+    word = "F O R G E" if os.environ.get("VEIL_BRAND", "").strip().lower() == "forge" else "A N C H O R"
+    print(f"{BOLD}  G L I M M E R V E I L   {word}{RESET}")
     print(f"{DIM}  swap the brain; she's still herself — local, owned, yours.{RESET}\n")
 
 

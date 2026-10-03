@@ -330,11 +330,18 @@ def main():
         for n in os.listdir(models):
             if n.endswith(".gguf") or n == "MODEL_PATH.txt":
                 os.remove(os.path.join(models, n))
-        shutil.copy2(smoke_tiny_gguf.PATH, models)
+        if os.environ.get("ANCHOR_DRIVE_BRAIN"):
+            brain = os.path.join(package, "brain")
+            os.makedirs(brain, exist_ok=True)
+            if not os.path.isfile(os.path.join(brain, "brain.gguf")):
+                shutil.copy2(smoke_tiny_gguf.PATH, os.path.join(brain, "brain.gguf"))
+        else:
+            shutil.copy2(smoke_tiny_gguf.PATH, models)
         env.pop("VEIL_MODEL", None)
         for k in ("PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV"):
             env.pop(k, None)
-        argv = (["cmd.exe", "/c", os.path.join(package, "Anchor.bat")] if IS_WIN
+        launcher = os.environ.get("ANCHOR_DRIVE_LAUNCHER", "Anchor.bat")
+        argv = (["cmd.exe", "/c", os.path.join(package, launcher)] if IS_WIN
                 else [os.path.join(package, "python", "python.exe")])
     print("drive: %s on %s  (%s)" % (" ".join(argv), sys.platform, "ConPTY" if IS_WIN else "pty"))
     t0 = time.time()
