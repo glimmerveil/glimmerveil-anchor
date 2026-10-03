@@ -2,3 +2,5 @@
 __pycache__/
 *.pyc
 .test_sandbox/
+dist/
+ci/.scratch_drive/

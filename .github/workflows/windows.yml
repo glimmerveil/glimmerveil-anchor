@@ -91,3 +91,36 @@ jobs:
           name: drive-transcript-${{ matrix.os }}
           path: ci/.scratch_drive/transcript.txt
           if-no-files-found: warn
+
+  # The download a Windows user gets: embedded Python + the engine wheel + Anchor + Anchor.bat, zipped.
+  # Then the same first night is driven through the PACKAGED launcher (it finds the toy brain in models\ on
+  # its own — VEIL_MODEL is not set), so a green here means the zip itself works, not just the source tree.
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: build the Windows zip
+        run: python ci/package_windows.py
+      - name: install the pseudo-console
+        run: "python -m pip install --only-binary=:all: \"pywinpty>=2.0.13,<3\""
+      - name: drive the packaged build — a stranger's first night from Anchor.bat
+        env:
+          ANCHOR_DRIVE_PACKAGE: ${{ github.workspace }}\dist\GlimmerveilAnchor
+        run: python ci/drive_e2e.py
+      - name: keep the transcript (read it word for word)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drive-transcript-package
+          path: ci/.scratch_drive/transcript.txt
+          if-no-files-found: warn
+      - name: keep the zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: GlimmerveilAnchor-windows-x64
+          path: dist/GlimmerveilAnchor-windows-x64.zip
+          if-no-files-found: error

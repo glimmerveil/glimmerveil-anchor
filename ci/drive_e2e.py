@@ -319,6 +319,19 @@ def main():
         os.makedirs(env[k], exist_ok=True)
 
     argv = [sys.executable, os.path.join(SRC, "veil_game.py")]
+    package = os.environ.get("ANCHOR_DRIVE_PACKAGE")
+    if package:
+        models = os.path.join(package, "models")
+        os.makedirs(models, exist_ok=True)
+        for n in os.listdir(models):
+            if n.endswith(".gguf") or n == "MODEL_PATH.txt":
+                os.remove(os.path.join(models, n))
+        shutil.copy2(smoke_tiny_gguf.PATH, models)
+        env.pop("VEIL_MODEL", None)
+        for k in ("PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV"):
+            env.pop(k, None)
+        argv = (["cmd.exe", "/c", os.path.join(package, "Anchor.bat")] if IS_WIN
+                else [os.path.join(package, "python", "python.exe")])
     print("drive: %s on %s  (%s)" % (" ".join(argv), sys.platform, "ConPTY" if IS_WIN else "pty"))
     t0 = time.time()
     con = Console(argv, env, REPO)
