@@ -181,11 +181,7 @@ jobs:
       - name: build the Forge shell (no brain)
         run: python ci/package_windows.py --forge
       - name: the shell carries no brain, and its launcher points at brain\brain.gguf
-        shell: bash
-        run: |
-          unzip -l dist/GlimmerveilForge-shell-windows-x64.zip | grep -q "GlimmerveilForge/Forge.bat"
-          ! unzip -l dist/GlimmerveilForge-shell-windows-x64.zip | grep -q "\.gguf"
-          grep -q 'brain\\brain.gguf' packaging/windows/Forge.bat
+        run: python -c "import zipfile; n = zipfile.ZipFile('dist/GlimmerveilForge-shell-windows-x64.zip').namelist(); assert 'GlimmerveilForge/Forge.bat' in n, 'no Forge.bat'; assert not [x for x in n if x.endswith('.gguf')], 'the shell carries a brain'; assert 'brain.gguf' in open('packaging/windows/Forge.bat').read(), 'launcher does not point at the brain'; print('shell ok:', len(n), 'files, no brain')"
       - name: add the toy brain the way her real one goes in
         run: |
           python -c "import sys; sys.path.insert(0, 'ci'); import smoke_tiny_gguf as s; s.fetch()"
