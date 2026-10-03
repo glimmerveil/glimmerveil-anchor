@@ -3301,7 +3301,13 @@ def _prose_partner_cut(text, own_name=None, min_hits=None):
     return ls + 1 if ls != -1 else p
 
 
-def generate_guarded(conn, peep_id, prompt, num_predict, name, model=None, recent_replies=None, voice=None):
+def bare_prompt(system, turns, prefill=""):
+    bare = [t for t in turns if t.get("role") != "assistant"]
+    return render_chat_turns(system, bare, prefill) if len(bare) != len(turns) else None
+
+
+def generate_guarded(conn, peep_id, prompt, num_predict, name, model=None, recent_replies=None, voice=None,
+                     loop_prompt=None):
     llm = get_llm()
     recent_replies = recent_replies or []
     for attempt in range(GHOST_MAX_REROLLS + 1):
@@ -3406,6 +3412,8 @@ def generate_guarded(conn, peep_id, prompt, num_predict, name, model=None, recen
             _erase_live("".join(shown))
         tag = "chat_rails" if railed else ("chat_loop" if looped else "chat_reroll")
         quarantine_blocked(conn, peep_id, "".join(buf), f"{tag}_{attempt}", "chat")
+        if looped and loop_prompt:
+            prompt, loop_prompt = loop_prompt, None
 
     print(f"{HER_COLOR}{name}{RESET}: {ara_ghost.SOFT_FALLBACK}")
     if voice:
@@ -3642,7 +3650,8 @@ def run_chat(conn, peep_id, history_path=DEFAULT_HISTORY, show_tokens=False, mod
 
         response = generate_guarded(conn, peep_id, prompt, NUM_PREDICT, name, model=model,
                                     recent_replies=recent_replies,
-                                    voice=(voice_streamer if VOICE else None))
+                                    voice=(voice_streamer if VOICE else None),
+                                    loop_prompt=bare_prompt(system, turns, CHAT_ASSISTANT_PREFILL))
 
         if not response:
             print(f"{DIM}[{name} is quiet.]{RESET}")

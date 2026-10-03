@@ -1022,7 +1022,8 @@ def chat_turn(conn, peep_id, peep, permanent, name, history, user_input, model, 
     turns = spine.build_chat_turns(name, user_input, history, retrieved, system=system, n_ctx=spine.N_CTX)
     prompt = spine.render_chat_turns(system, turns, prefill=spine.CHAT_ASSISTANT_PREFILL)
     response = spine.generate_guarded(conn, peep_id, prompt, spine.NUM_PREDICT, name, model=model,
-                                      recent_replies=recent_replies, voice=voice_streamer)
+                                      recent_replies=recent_replies, voice=voice_streamer,
+                                      loop_prompt=spine.bare_prompt(system, turns, spine.CHAT_ASSISTANT_PREFILL))
     if not response:
         print(f"{DIM}[{name} is quiet.]{RESET}")
         return (None, None)
