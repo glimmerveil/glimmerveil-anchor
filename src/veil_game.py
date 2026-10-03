@@ -15,14 +15,7 @@ DIM = "\033[2m"
 BOLD = "\033[1m"
 RESET = "\033[0m"
 
-TITLE = r"""
- __      __       _  _
- \ \    / /      (_)| |
-  \ \  / /  ___   _ | |
-   \ \/ /  / _ \ | || |
-    \  /  |  __/ | || |
-     \/    \___| |_||_|
-"""
+TITLE = "\n"
 
 
 def _clear():
@@ -32,8 +25,8 @@ def _clear():
 
 def _banner():
     print(f"{CYAN}{TITLE}{RESET}")
-    print(f"{BOLD}  G L I M M E R V E I L   F O R G E{RESET}")
-    print(f"{DIM}  she can break; she cannot be taken — local, owned, yours.{RESET}\n")
+    print(f"{BOLD}  G L I M M E R V E I L   A N C H O R{RESET}")
+    print(f"{DIM}  swap the brain; she's still herself — local, owned, yours.{RESET}\n")
 
 
 def _fmt_when(ts):
