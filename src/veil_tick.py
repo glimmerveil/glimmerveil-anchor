@@ -1007,7 +1007,8 @@ def chat_turn(conn, peep_id, peep, permanent, name, history, user_input, model, 
     _RECENT_INJECTED.appendleft([(r["content"] or "") for r in retrieved])
     equipped = spine.list_equipped_keepsakes(conn, peep_id)
     system = spine.build_chat_system(peep, permanent, equipped=equipped)
-    system = system + "\n\n" + _place_block(together=True)
+    if not spine.LEAN_SYSTEM:
+        system = system + "\n\n" + _place_block(together=True)
     spine.PLACE_TAIL = (f"Where you are right now: the {_place().replace('_', ' ')}, "
                         f"with {YOUR_NAME}.")
     _tt_now = time.time()
@@ -1018,7 +1019,8 @@ def chat_turn(conn, peep_id, peep, permanent, name, history, user_input, model, 
     if _tt_last and _tt_now > _tt_last:
         spine.TIME_TAIL += (f" {YOUR_NAME} last spoke to you "
                             f"{_humanize_elapsed(_tt_now - _tt_last)} ago.")
-    system = system + "\n\n" + _time_block(conn, peep_id)
+    if not spine.LEAN_SYSTEM:
+        system = system + "\n\n" + _time_block(conn, peep_id)
     turns = spine.build_chat_turns(name, user_input, history, retrieved, system=system, n_ctx=spine.N_CTX)
     prompt = spine.render_chat_turns(system, turns, prefill=spine.CHAT_ASSISTANT_PREFILL)
     response = spine.generate_guarded(conn, peep_id, prompt, spine.NUM_PREDICT, name, model=model,

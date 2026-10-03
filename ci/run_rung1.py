@@ -31,6 +31,7 @@ TESTS = [
     "test_veil_one_of_each.py",
     "test_veil_fit_notes.py",
     "test_veil_loop_drops_kept.py",
+    "test_veil_transfer.py",
     "test_veil_melt_guard.py",
     "test_veil_models.py",
     "test_veil_night_drive.py",

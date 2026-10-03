@@ -970,6 +970,7 @@ def _strip_speaker_label(text):
 
 TURN_CONTAINER = os.environ.get("VEIL_TURN_CONTAINER", "0") == "1"
 LIVE_FRAME = os.environ.get("VEIL_LIVE_FRAME", "0") == "1"
+LEAN_SYSTEM = os.environ.get("VEIL_LEAN_SYSTEM", "0") == "1"
 
 
 def _live_frame(text):
@@ -991,7 +992,7 @@ def _announce_dials():
     frame = ("person-frame=%.2f%s" % (PERMANENT_3P_MAX_SHARE,
                                       "" if OWNER_NAME else " ⚠NO-OWNER-NAME:pronouns-only"))
     dials = (("keep-last-reply", _keep_last_reply_on()),
-             ("turn-container", TURN_CONTAINER), ("live-frame", LIVE_FRAME), ("memory-dates", MEMORY_DATES),
+             ("turn-container", TURN_CONTAINER), ("live-frame", LIVE_FRAME), ("lean-system", LEAN_SYSTEM),("memory-dates", MEMORY_DATES),
              ("guide-tail", GUIDE_TAIL), ("place-tail", PLACE_TAIL_ON),
              ("time-tail", TIME_TAIL_ON),
              ("prefill=" + PREFILL, bool(PREFILL)),
