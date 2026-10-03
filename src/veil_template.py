@@ -6,6 +6,7 @@ import struct
 _SCALAR = {0: "<B", 1: "<b", 2: "<H", 3: "<h", 4: "<I", 5: "<i", 6: "<f", 7: "<?", 10: "<Q", 11: "<q", 12: "<d"}
 _STR_KEYS = ("general.architecture", "general.name", "general.type", "tokenizer.chat_template")
 _ID_KEYS = ("tokenizer.ggml.bos_token_id", "tokenizer.ggml.eos_token_id")
+_SHAPE_KEYS = (".block_count", ".embedding_length")
 _MAX_STR = 1 << 24
 THINK_EXTRA = 768
 
@@ -54,6 +55,8 @@ def gguf_meta(path, tokens=False):
                 (t,) = struct.unpack("<I", f.read(4))
                 if key in _STR_KEYS and t == 8:
                     out[key] = _read_str(f)
+                elif key.endswith(_SHAPE_KEYS) and t in (4, 5, 10, 11):
+                    (out[key],) = struct.unpack(_SCALAR[t], f.read(struct.calcsize(_SCALAR[t])))
                 elif key in _ID_KEYS and t in (4, 5, 10, 11):
                     (out[key],) = struct.unpack(_SCALAR[t], f.read(struct.calcsize(_SCALAR[t])))
                 elif tokens and key == "tokenizer.ggml.tokens" and t == 9:
@@ -229,6 +232,27 @@ FAMILIES = {
 # from a prompt of his turns alone (and invented origins); Llama 3 answered the one asked. Coder brains stay off:
 # one kept reply gave Qwen2.5-Coder a verbatim echo AND a parrot (07-28).
 NEWEST_NOTE_FAMILIES = ("llama3",)
+SMALL_BRAIN = 2.5e9
+
+
+def core_params(meta):
+    arch = meta.get("general.architecture") or ""
+    layers, width = meta.get(arch + ".block_count"), meta.get(arch + ".embedding_length")
+    if not layers or not width:
+        return None
+    return 12 * layers * width * width
+
+
+def fit_notes(fam, meta):
+    notes = []
+    if fam.thinks:
+        notes.append("This is a reasoning model: it thinks well, but it may not hold her as a character. "
+                     "A chat (instruct) model is a better home for her.")
+    est = core_params(meta)
+    if est and est < SMALL_BRAIN:
+        notes.append("This is a very small model (under 3B): she may narrate both sides of a scene "
+                     "instead of keeping to hers. A 3B or larger model holds her far better.")
+    return notes
 
 
 def keeps_last_for(path):
@@ -386,6 +410,9 @@ def install(spine, say=print):
                     "Point Anchor at an instruct .gguf instead.]")
             elif sure:
                 say("[brain format: %s]" % fam.label)
+            if capable:
+                for note in fit_notes(fam, gguf_meta(spine.MODEL_PATH)):
+                    say("[%s]" % note)
             else:
                 say("[brain format: unknown, using ChatML. If replies look broken, set "
                     "VEIL_CHAT_FORMAT to one of: %s]" % ", ".join(FAMILIES))
