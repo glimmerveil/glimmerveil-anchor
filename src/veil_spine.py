@@ -969,6 +969,13 @@ def _strip_speaker_label(text):
 
 
 TURN_CONTAINER = os.environ.get("VEIL_TURN_CONTAINER", "0") == "1"
+LIVE_FRAME = os.environ.get("VEIL_LIVE_FRAME", "0") == "1"
+
+
+def _live_frame(text):
+    who = OWNER_NAME or "He"
+    return (f'{who} just said to you: "{text}"\n\n'
+            f"Respond in your own voice. Say only your own words; do not write {who}'s reply.")
 GUIDE_TAIL = os.environ.get("VEIL_GUIDE_TAIL", "1") == "1"
 PREFILL = os.environ.get("VEIL_PREFILL", "")
 if PREFILL:
@@ -984,7 +991,7 @@ def _announce_dials():
     frame = ("person-frame=%.2f%s" % (PERMANENT_3P_MAX_SHARE,
                                       "" if OWNER_NAME else " ⚠NO-OWNER-NAME:pronouns-only"))
     dials = (("keep-last-reply", _keep_last_reply_on()),
-             ("turn-container", TURN_CONTAINER), ("memory-dates", MEMORY_DATES),
+             ("turn-container", TURN_CONTAINER), ("live-frame", LIVE_FRAME), ("memory-dates", MEMORY_DATES),
              ("guide-tail", GUIDE_TAIL), ("place-tail", PLACE_TAIL_ON),
              ("time-tail", TIME_TAIL_ON),
              ("prefill=" + PREFILL, bool(PREFILL)),
@@ -1104,6 +1111,8 @@ def build_chat_turns(name, user_message, history, retrieved, system="", n_ctx=N_
     _announce_dials()
     framed_past = _frame_retrieved(retrieved)
     live_turn = _defuse_transcript(user_message)
+    if LIVE_FRAME:
+        live_turn = _live_frame(live_turn)
     final_user = framed_past + live_turn
 
     her_prefix = f"{name} said:"

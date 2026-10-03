@@ -153,7 +153,7 @@ class Family:
         elif k == "phi3":
             s += "<|assistant|>\n"
         elif k == "deepseek":
-            s += "<｜Assistant｜>"
+            s += "<｜Assistant｜>" + self.nothink
         return s + prefill
 
 
@@ -162,7 +162,13 @@ class _Qwen3(Family):
 
 
 class _DeepSeek(Family):
-    thinks = True
+    @property
+    def thinks(self):
+        return os.environ.get("VEIL_DEEPSEEK_THINK", "1") == "1"
+
+    @property
+    def nothink(self):
+        return "" if self.thinks else "<think>\n\n</think>\n\n"
 
 
 _END_MARKS = re.compile(r"<\|(?:eot|eom|end|im_end|eot_id|end_of_turn|endoftext)\|>|<end_of_turn>|</s>")
