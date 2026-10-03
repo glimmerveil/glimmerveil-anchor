@@ -32,6 +32,7 @@ TESTS = [
     "test_veil_nonspeech.py",
     "test_veil_place.py",
     "test_veil_place_ship.py",
+    "test_veil_portaudio_mic.py",
     "test_veil_play_watchdog.py",
     "test_veil_prose_face.py",
     "test_veil_rails_autonomous.py",

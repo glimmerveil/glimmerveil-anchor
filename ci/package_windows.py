@@ -15,6 +15,13 @@ PY_VERSION = os.environ.get("ANCHOR_PY_EMBED", "3.12.10")
 PY_URL = "https://www.python.org/ftp/python/%s/python-%s-embed-amd64.zip" % (PY_VERSION, PY_VERSION)
 ENGINE = "llama-cpp-python==0.3.34"
 ENGINE_INDEX = "https://abetlen.github.io/llama-cpp-python/whl/cpu"
+VOICE = "--voice" in sys.argv
+VOICE_PKGS = ["kokoro-onnx", "sounddevice", "soundfile", "pywhispercpp"]
+VOICE_FILES = [
+    ("kokoro-v1.0.onnx", "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx"),
+    ("voices-v1.0.bin", "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin"),
+    ("ggml-base.en.bin", "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin"),
+]
 
 
 def sha256(path):
@@ -49,7 +56,23 @@ def install_engine(site_packages):
                          % (sys.version_info[0], sys.version_info[1], PY_VERSION))
     os.makedirs(site_packages, exist_ok=True)
     subprocess.check_call([sys.executable, "-m", "pip", "install", "--no-cache-dir", "--only-binary=:all:",
-                           "--target", site_packages, ENGINE, "--extra-index-url", ENGINE_INDEX])
+                           "--target", site_packages, ENGINE] + (VOICE_PKGS if VOICE else [])
+                          + ["--extra-index-url", ENGINE_INDEX])
+    subprocess.call([sys.executable, "-m", "pip", "list", "--path", site_packages])
+
+
+def fetch_voice(dest):
+    os.makedirs(dest, exist_ok=True)
+    cache = os.path.join(DIST, "voice_cache")
+    os.makedirs(cache, exist_ok=True)
+    for name, url in VOICE_FILES:
+        c = os.path.join(cache, name)
+        if not os.path.isfile(c):
+            with urllib.request.urlopen(url, timeout=600) as r, open(c + ".part", "wb") as f:
+                shutil.copyfileobj(r, f)
+            os.replace(c + ".part", c)
+        print("voice file %s  %.1f MB  sha256 %s" % (name, os.path.getsize(c) / 1e6, sha256(c)))
+        shutil.copy2(c, os.path.join(dest, name))
 
 
 def copy_app(app):
@@ -68,13 +91,15 @@ def main():
     fetch_python(os.path.join(ROOT, "python"))
     install_engine(os.path.join(ROOT, "python", "Lib", "site-packages"))
     copy_app(os.path.join(ROOT, "app"))
+    if VOICE:
+        fetch_voice(os.path.join(ROOT, "voice"))
     os.makedirs(os.path.join(ROOT, "models"))
     win = os.path.join(REPO, "packaging", "windows")
     shutil.copy2(os.path.join(win, "Anchor.bat"), ROOT)
     shutil.copy2(os.path.join(win, "README_WINDOWS.txt"), os.path.join(ROOT, "README.txt"))
     shutil.copy2(os.path.join(REPO, "LICENSE"), ROOT)
     with open(os.path.join(ROOT, "models", "PUT_YOUR_GGUF_HERE.txt"), "w", encoding="utf-8") as f:
-        f.write("Put one ChatML / Qwen-family instruct model (.gguf) in this folder, then run Anchor.bat.\n")
+        f.write("Put a chat / instruct model (.gguf) in this folder, then run Anchor.bat (or pick one with [m]).\n")
 
     for bad in (".db", ".gguf", "card.json", ".veil"):
         for d, _, files in os.walk(ROOT):
@@ -82,7 +107,7 @@ def main():
             if hit:
                 raise SystemExit("FAIL the package carries %s in %s" % (hit, d))
 
-    out = os.path.join(DIST, "%s-windows-x64.zip" % NAME)
+    out = os.path.join(DIST, "%s%s-windows-x64.zip" % (NAME, "-voice" if VOICE else ""))
     if os.path.exists(out):
         os.remove(out)
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zf:

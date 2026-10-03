@@ -134,6 +134,18 @@ def _phonemize_worker_stop():
 atexit.register(_phonemize_worker_stop)
 
 
+def _wait_line(p, timeout):
+    if not sys.platform.startswith("win"):
+        if not select.select([p.stdout], [], [], timeout)[0]:
+            return None
+        return p.stdout.readline()
+    box = []
+    t = threading.Thread(target=lambda: box.append(p.stdout.readline()), daemon=True)
+    t.start()
+    t.join(timeout)
+    return box[0] if box else None
+
+
 def _phonemize(text, lang):
     for _attempt in (0, 1):
         try:
@@ -143,15 +155,16 @@ def _phonemize(text, lang):
                 p = subprocess.Popen([sys.executable, "-c", _PHONEMIZE_WORKER_SRC],
                                      stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                      stderr=subprocess.DEVNULL, text=True)
-                if not select.select([p.stdout], [], [], _PHONEMIZE_TIMEOUT)[0] \
-                        or p.stdout.readline().strip() != "ready":
+                line = _wait_line(p, _PHONEMIZE_TIMEOUT)
+                if line is None or line.strip() != "ready":
                     raise RuntimeError("phonemize worker failed to start")
                 _PH["proc"] = p
             p.stdin.write(json.dumps({"t": text, "l": lang}) + "\n")
             p.stdin.flush()
-            if not select.select([p.stdout], [], [], _PHONEMIZE_TIMEOUT)[0]:
+            line = _wait_line(p, _PHONEMIZE_TIMEOUT)
+            if line is None:
                 raise RuntimeError("phonemize worker timed out")
-            resp = json.loads(p.stdout.readline())
+            resp = json.loads(line)
             _PH["calls"] += 1
             if resp.get("p"):
                 return resp["p"]
@@ -578,7 +591,7 @@ def _record_to_wav(path, seconds_max=RECORD_SECONDS_MAX):
     elif shutil.which("arecord"):
         cmd = ["arecord", "-q", "-t", "raw", "-f", "S16_LE", "-r", "16000", "-c", "1"]
     else:
-        return False
+        return _record_to_wav_portaudio(path, seconds_max)
     hold = os.environ.get("VEIL_MIC_HOLD", "1") != "0"
     global _REC_PROC
     proc, fresh = (_REC_PROC if hold else None), True
@@ -684,6 +697,102 @@ def _record_to_wav(path, seconds_max=RECORD_SECONDS_MAX):
               "(her voice still works)]", file=sys.stderr)
         _record_to_wav._dead_mic_said = True
 
+    if not started or not frames:
+        return False
+    sf.write(path, np.concatenate(frames), rate)
+    return True
+
+
+def _record_to_wav_portaudio(path, seconds_max=RECORD_SECONDS_MAX):
+    try:
+        import queue as _queue
+        import numpy as np
+        import soundfile as sf
+        import sounddevice as sd
+    except Exception:
+        return False
+    _use_system_default_audio(sd)
+    rate = 16000
+    block = int(rate * 0.1)
+    START_RMS, STOP_RMS = 0.02, 0.012
+    SILENCE_HANG = float(os.environ.get("VEIL_SILENCE_HANG", "5.0"))
+    START_TIMEOUT = 9.0
+    LEAD_CHUNKS = 3
+    WARMUP_CHUNKS = 3
+    ONSET_NEEDED = 2
+    DEAD_AIR = float(os.environ.get("VEIL_MIC_DEAD_AIR", "2.0"))
+    q = _queue.Queue()
+
+    def _cb(indata, frames, t, status):
+        q.put(bytes(indata))
+
+    try:
+        stream = sd.RawInputStream(samplerate=rate, channels=1, dtype="int16", blocksize=block, callback=_cb)
+        stream.start()
+    except Exception:
+        if not getattr(_record_to_wav, "_dead_mic_said", False):
+            print("[voice: no microphone found — she can't hear you right now; type instead "
+                  "(her voice still works)]", file=sys.stderr)
+            _record_to_wav._dead_mic_said = True
+        return False
+    frames, ring = [], []
+    started, silence, elapsed = False, 0.0, 0.0
+    warmup, onset_run, got_audio = WARMUP_CHUNKS, 0, False
+    buf = b""
+    nbytes = block * 2
+    wall_deadline = time.time() + seconds_max + 15.0
+    if not getattr(_record_to_wav, "_announced", False):
+        print("[listening… just talk; pause when you're done]", file=sys.stderr)
+        _record_to_wav._announced = True
+    try:
+        while elapsed < seconds_max and time.time() < wall_deadline:
+            try:
+                raw = q.get(timeout=DEAD_AIR)
+            except _queue.Empty:
+                break
+            got_audio = True
+            buf += raw
+            if len(buf) < nbytes:
+                continue
+            raw, buf = buf[:nbytes], buf[nbytes:]
+            elapsed += 0.1
+            if warmup > 0:
+                warmup -= 1
+                continue
+            arr = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+            rms = float(np.sqrt(np.mean(arr * arr)))
+            if not started:
+                ring.append(arr)
+                if len(ring) > LEAD_CHUNKS:
+                    ring.pop(0)
+                if rms > START_RMS:
+                    onset_run += 1
+                    if onset_run >= ONSET_NEEDED:
+                        started = True
+                        _record_to_wav._announced = False
+                        frames.extend(ring)
+                else:
+                    onset_run = 0
+                    if elapsed >= START_TIMEOUT:
+                        break
+            else:
+                frames.append(arr)
+                if rms < STOP_RMS:
+                    silence += 0.1
+                    if silence >= SILENCE_HANG:
+                        break
+                else:
+                    silence = 0.0
+    finally:
+        try:
+            stream.stop()
+            stream.close()
+        except Exception:
+            pass
+    if not got_audio and not getattr(_record_to_wav, "_dead_mic_said", False):
+        print("[voice: the mic gave no sound — she can't hear you right now; type instead "
+              "(her voice still works)]", file=sys.stderr)
+        _record_to_wav._dead_mic_said = True
     if not started or not frames:
         return False
     sf.write(path, np.concatenate(frames), rate)
