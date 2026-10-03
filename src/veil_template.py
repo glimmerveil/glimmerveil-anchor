@@ -410,12 +410,12 @@ def install(spine, say=print):
                     "Point Anchor at an instruct .gguf instead.]")
             elif sure:
                 say("[brain format: %s]" % fam.label)
-            if capable:
-                for note in fit_notes(fam, gguf_meta(spine.MODEL_PATH)):
-                    say("[%s]" % note)
             else:
                 say("[brain format: unknown, using ChatML. If replies look broken, set "
                     "VEIL_CHAT_FORMAT to one of: %s]" % ", ".join(FAMILIES))
+            if capable:
+                for note in fit_notes(fam, gguf_meta(spine.MODEL_PATH)):
+                    say("[%s]" % note)
         return fam
 
     spine.FAMILY_KEEPS_LAST = lambda: keeps_last_for(spine.MODEL_PATH)
