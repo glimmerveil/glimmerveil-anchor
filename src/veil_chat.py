@@ -6,8 +6,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import veil_spine as spine
 
-spine.MODEL_PATH = os.environ.get(
-    "VEIL_MODEL", os.path.expanduser("~/anchor/models/Qwen2.5-7B-Instruct-abliterated-v2.Q8_0.gguf"))
+import veil_paths
+spine.MODEL_PATH = veil_paths.model_path()
 spine.DEFAULT_DB = os.environ.get("VEIL_DB", os.path.expanduser("~/anchor/veil.db"))
 spine.DEFAULT_HISTORY = os.environ.get("VEIL_HISTORY", os.path.expanduser("~/anchor/veil_history.json"))
 

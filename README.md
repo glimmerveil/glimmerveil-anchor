@@ -69,8 +69,8 @@ diary and settles her memory on the way out.
 Point `VEIL_MODEL` at a different GGUF and the same companion wakes on it — her memory, diary and
 card are in her folder, not in the model. A new brain is weakest in its first cold session, so the
 door shows her **anchor questions** on every wake: ask ONE, let her answer in her own words, then
-just talk. ⚠ Anchor does not yet *detect* that you changed the model file by hand, so it will not
-prompt the ritual for you — do it yourself after a swap.
+just talk. Anchor notices when the model file changed since her last wake (her folder keeps a
+small fingerprint of the brain she last woke on) and shows the ritual for you the first time.
 
 ## Windows
 

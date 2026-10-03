@@ -120,7 +120,9 @@ def _wake():
             card = veil_card.load(card_path)
             try:
                 import veil_update
-                if veil_update.anchor_refire_pending():
+                import veil_paths
+                swapped = veil_update.brain_changed(active["folder_path"], veil_paths.model_path())
+                if veil_update.anchor_refire_pending() or swapped:
                     print(f"\n{BOLD}{p.Subj} {'have' if p.subj in ('they',) else 'has'} a new "
                           f"brain since last time.{RESET}")
                     _anchor_ritual(card)

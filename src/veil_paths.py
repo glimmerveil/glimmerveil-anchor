@@ -75,6 +75,14 @@ def refuse_forge_env():
         refuse_forge(os.environ.get(k), "%s" % k)
 
 
+DEFAULT_MODEL_NAME = "Qwen2.5-7B-Instruct-abliterated-v2.Q8_0.gguf"
+
+
+def model_path():
+    return os.environ.get("VEIL_MODEL") or os.path.expanduser(
+        os.path.join("~", HOME_DIRNAME, "models", DEFAULT_MODEL_NAME))
+
+
 def data_dir():
     env = os.environ.get("VEIL_DATA")
     d = env if env else os.path.join(base_dir(), _platform_dirname(_DATA_DIRNAME))

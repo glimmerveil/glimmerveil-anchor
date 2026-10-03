@@ -102,6 +102,44 @@ def apply(manifest):
     return True
 
 
+BRAIN_NOTE = "brain.json"
+_END = 1 << 20
+
+
+def brain_fingerprint(path):
+    try:
+        size = os.path.getsize(path)
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            h.update(f.read(_END))
+            if size > _END:
+                f.seek(max(size - _END, _END))
+                h.update(f.read(_END))
+    except OSError:
+        return None
+    return {"name": os.path.basename(path), "size": size, "sha256_ends": h.hexdigest()}
+
+
+def brain_changed(folder, model_path):
+    now = brain_fingerprint(model_path) if model_path else None
+    if now is None or not folder:
+        return False
+    note = os.path.join(folder, BRAIN_NOTE)
+    try:
+        with open(note, encoding="utf-8") as f:
+            was = json.load(f)
+    except (OSError, ValueError):
+        was = None
+    try:
+        with open(note, "w", encoding="utf-8") as f:
+            json.dump(now, f)
+    except OSError:
+        pass
+    if not isinstance(was, dict):
+        return False
+    return (was.get("size"), was.get("sha256_ends")) != (now["size"], now["sha256_ends"])
+
+
 def anchor_refire_pending():
     return os.path.exists(ANCHOR_REFIRE)
 
