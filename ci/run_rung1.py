@@ -28,6 +28,7 @@ TESTS = [
     "test_veil_lane_words.py",
     "test_veil_keep_last_family.py",
     "test_veil_time_tail_default.py",
+    "test_veil_one_of_each.py",
     "test_veil_melt_guard.py",
     "test_veil_models.py",
     "test_veil_night_drive.py",

@@ -1000,6 +1000,7 @@ def _announce_dials():
              ("kw-weight=%.1f" % KW_HIT_WEIGHT, KW_HIT_WEIGHT != 2.0),
              ("diary-rows=%d" % DIARY_ROWS_PER_TURN, DIARY_ROWS_PER_TURN != 1),
              ("fold-to-diary", FOLD_TO_DIARY),
+             ("one-of-each", DIARY_ONE_OF_EACH),
              ("fold-reflection", FOLD_REFLECTION))
     on = " + ".join(n for n, f in dials if f)
     if not on:
@@ -1179,6 +1180,17 @@ TRACE_RETRIEVAL = os.environ.get("VEIL_TRACE_RETRIEVAL", "0") == "1"
 HIS_ROWS_PER_TURN = int(os.environ.get("VEIL_HIS_ROWS_PER_TURN", "1") or -1)
 
 DIARY_ROWS_PER_TURN = int(os.environ.get("VEIL_DIARY_ROWS_PER_TURN", "2") or 2)
+
+DIARY_ONE_OF_EACH = os.environ.get("VEIL_DIARY_ONE_OF_EACH", "1") == "1"
+
+
+def _diary_kind(row):
+    src = (row["diary_source"] or "")
+    if src == "fold":
+        return "fold"
+    if src == "indulge":
+        return "indulge"
+    return "written"
 
 INJECT_COOLDOWN_TURNS = int(os.environ.get("VEIL_INJECT_COOLDOWN", "2") or 0)
 
@@ -1362,6 +1374,8 @@ def retrieve(conn, peep_id, query, limit=RETRIEVAL_LIMIT, exclude_texts=None,
     result, reflections, diaries, keeps, archives, his = [], 0, 0, 0, 0, 0
     seen_texts = set()
     diary_days = set()
+    diary_kinds = set()
+    deferred = []
     for row in candidates:
         if len(result) >= limit:
             break
@@ -1392,11 +1406,16 @@ def retrieve(conn, peep_id, query, limit=RETRIEVAL_LIMIT, exclude_texts=None,
         if _key and _key in seen_texts:
             continue
         seen_texts.add(_key)
+        if (DIARY_ONE_OF_EACH and mtype == "diary" and diaries >= 1
+                and _diary_kind(row) in diary_kinds):
+            deferred.append(row)
+            continue
         if mtype == "reflection":
             reflections += 1
         elif mtype == "diary":
             diaries += 1
             diary_days.add(_row_day(row["timestamp"]))
+            diary_kinds.add(_diary_kind(row))
         elif mtype == "keepsake":
             keeps += 1
         elif mtype == "archive":
@@ -1404,6 +1423,16 @@ def retrieve(conn, peep_id, query, limit=RETRIEVAL_LIMIT, exclude_texts=None,
         if is_his:
             his += 1
         result.append({"content": row["content"], "kind": mtype,
+                       "ts": row["timestamp"]})
+    for row in deferred:
+        if len(result) >= limit or diaries >= DIARY_ROWS_PER_TURN:
+            break
+        if _row_day(row["timestamp"]) in diary_days:
+            continue
+        diaries += 1
+        diary_days.add(_row_day(row["timestamp"]))
+        diary_kinds.add(_diary_kind(row))
+        result.append({"content": row["content"], "kind": row["memory_type"],
                        "ts": row["timestamp"]})
     if TRACE_RETRIEVAL:
         try:
