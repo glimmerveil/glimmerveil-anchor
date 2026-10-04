@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Glimmerveil Anchor
+Comment=Persistent identity and memory for local models
+Exec=AppRun
+Icon=glimmerveil-anchor
+Terminal=true
+Categories=Utility;

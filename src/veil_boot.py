@@ -38,7 +38,6 @@ def _export_world():
     os.makedirs(DATA_DIR, exist_ok=True)
     env = os.environ
     env.setdefault("VEIL_DATA", DATA_DIR)
-    env.setdefault("VEIL_PEEPS", os.path.join(DATA_DIR, "peeps"))
     env.setdefault("VEIL_N_THREADS", str(_physical_cores()))
 
     model_dir = os.path.join(VEIL_OPT, "model")

@@ -1,0 +1,8 @@
+#!/bin/bash
+set -u
+HERE="$(dirname "$(readlink -f "$0")")"
+export APPDIR="$HERE"
+case "${LD_PRELOAD:-}" in *gameoverlayrenderer*) unset LD_PRELOAD ;; esac
+unset PYTHONPATH PYTHONHOME
+export PYTHONNOUSERSITE=1
+exec "$HERE/opt/veil/python/bin/python3" "$HERE/opt/veil/app/veil_boot.py" "$@"

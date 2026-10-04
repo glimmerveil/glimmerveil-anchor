@@ -343,6 +343,11 @@ def main():
         launcher = os.environ.get("ANCHOR_DRIVE_LAUNCHER", "Anchor.bat")
         argv = (["cmd.exe", "/c", os.path.join(package, launcher)] if IS_WIN
                 else [os.path.join(package, "python", "python.exe")])
+    appimage = os.environ.get("ANCHOR_DRIVE_APPIMAGE")
+    if appimage:
+        for k in ("PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV"):
+            env.pop(k, None)
+        argv = [appimage]
     print("drive: %s on %s  (%s)" % (" ".join(argv), sys.platform, "ConPTY" if IS_WIN else "pty"))
     t0 = time.time()
     con = Console(argv, env, REPO)

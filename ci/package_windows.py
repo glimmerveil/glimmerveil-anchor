@@ -104,7 +104,7 @@ def main():
             f.write("ci/forge_add_brain.py puts her brain here as brain.gguf.\n")
     else:
         shutil.copy2(os.path.join(win, "Anchor.bat"), ROOT)
-        shutil.copy2(os.path.join(win, "README_WINDOWS.txt"), os.path.join(ROOT, "README.txt"))
+        shutil.copy2(os.path.join(REPO, "packaging", "README_ANCHOR.txt"), os.path.join(ROOT, "README.txt"))
     shutil.copy2(os.path.join(REPO, "LICENSE"), ROOT)
     with open(os.path.join(ROOT, "models", "PUT_YOUR_GGUF_HERE.txt"), "w", encoding="utf-8") as f:
         f.write("Put a chat / instruct model (.gguf) in this folder, then run Anchor.bat (or pick one with [m]).\n")
