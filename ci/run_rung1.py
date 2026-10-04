@@ -18,6 +18,7 @@ TESTS = [
     "test_veil_brain_swap.py",
     "test_veil_bye_door.py",
     "test_veil_dials_announced.py",
+    "test_veil_events.py",
     "test_veil_fold_lock.py",
     "test_veil_fold_return.py",
     "test_veil_ghost.py",

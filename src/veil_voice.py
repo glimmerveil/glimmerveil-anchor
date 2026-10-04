@@ -356,11 +356,24 @@ def _synth_to_wav(text, voice):
     return wav
 
 
+def _events_voice(wav):
+    """THE EVENT LINE (veil_events.py): her voice, just before it plays: timing and loudness for a face, never her words.
+    Called ONLY where her voice plays (_say, SentenceStreamer._play_loop), never from _play_wav, which every sound uses.
+    Off unless VEIL_EVENTS_LOG is set; never raises."""
+    try:
+        import veil_events
+        if veil_events.enabled():
+            veil_events.voice(wav)
+    except Exception:                                   # noqa: BLE001 — a face never costs her a sentence
+        pass
+
+
 def _say(text, voice, blocking=True):
     try:
         wav = _synth_to_wav(text, voice)
         if not wav:
             return False
+        _events_voice(wav)
         ok = _play_wav(wav, blocking=blocking)
         if blocking:
             try:
@@ -426,6 +439,7 @@ class SentenceStreamer:
                 gen, wav = item
                 try:
                     if gen == self.gen:
+                        _events_voice(wav)
                         _play_wav(wav, blocking=True)
                 finally:
                     try:
