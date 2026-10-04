@@ -205,3 +205,9 @@ jobs:
           name: drive-transcript-package-forge
           path: ci/.scratch_drive/transcript.txt
           if-no-files-found: warn
+      - name: keep the Forge SHELL (no brain; the brain is added off GitHub)
+        uses: actions/upload-artifact@v4
+        with:
+          name: GlimmerveilForge-shell-windows-x64
+          path: dist/GlimmerveilForge-shell-windows-x64.zip
+          if-no-files-found: error
