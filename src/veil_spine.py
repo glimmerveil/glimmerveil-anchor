@@ -1009,7 +1009,9 @@ def _announce_dials():
              ("diary-rows=%d" % DIARY_ROWS_PER_TURN, DIARY_ROWS_PER_TURN != 1),
              ("fold-to-diary", FOLD_TO_DIARY),
              ("one-of-each", DIARY_ONE_OF_EACH),
-             ("fold-reflection", FOLD_REFLECTION))
+             ("fold-reflection", FOLD_REFLECTION),
+             ("fold-fit-batch", FOLD_FIT_BATCH),
+             ("fold-fit-margin=%d" % FOLD_FIT_MARGIN, FOLD_FIT_BATCH))
     on = " + ".join(n for n, f in dials if f)
     if not on:
         return
@@ -2773,6 +2775,43 @@ def restore_snapshot_file(db_path, snap_path):
         return False, f"Restore failed ({e}) — if a .pre_restore_ file exists beside her DB, that is the original."
 
 
+# THE FOLD FITS THE WINDOW. A batch is COMPRESSION_BATCH_SIZE rows, and rows grow as a companion's
+# conversations get longer. The summary prompt is the batch + its instructions + NUM_PREDICT, inside N_CTX,
+# and nothing used to check that it fit: an oversized batch made the engine raise, the drain stepped over it,
+# and it stayed in the stream forever. Two such batches can hold the pile above the high-water on their own,
+# so every session becomes a drain that folds away all of the fresh conversation. The cure counts the REAL
+# rendered prompt with the loaded model's own tokenizer and leaves rows off the END until it fits; those
+# rows are untouched and lead the next batch. VEIL_FOLD_FIT_BATCH=0 restores the old shape.
+FOLD_FIT_BATCH  = os.environ.get("VEIL_FOLD_FIT_BATCH", "1") != "0"
+FOLD_FIT_MARGIN = int(os.environ.get("VEIL_FOLD_FIT_MARGIN", "256") or 0)   # room for the detail retry
+
+
+def _prompt_tokens(text):
+    """Tokens this text costs the loaded model (its own tokenizer — right for every family Anchor runs);
+    with no model loaded, a deliberately PESSIMISTIC chars/3, so a batch can only be under-filled."""
+    if _LLM is not None:
+        try:
+            return len(_LLM.tokenize(text.encode("utf-8"), add_bos=True, special=True))
+        except Exception:
+            pass
+    return len(text) // 3 + 1
+
+
+def _fit_fold_batch(peep_name, card, batch):
+    """The longest PREFIX of `batch` whose summary prompt fits N_CTX with NUM_PREDICT and the margin to
+    spare. Returns (rows, left_off). Never fewer than one row. Template-path batches are left alone."""
+    if not FOLD_FIT_BATCH or len(batch) <= 1:
+        return batch, 0
+    if _generate_template_memories(batch)["templates"]:
+        return batch, 0
+    budget = N_CTX - NUM_PREDICT - FOLD_FIT_MARGIN
+    rows = list(batch)
+    while len(rows) > 1 and _prompt_tokens(
+            render_chat(None, _build_summary_prompt(peep_name, card, rows))) > budget:
+        rows.pop()
+    return rows, len(batch) - len(rows)
+
+
 def _fold_one_batch(conn, peep_id, peep_name, card, batch, model=None,
                     promote_budget=None, drain_since=None):
     template_data = _generate_template_memories(batch)
@@ -2938,16 +2977,21 @@ def run_compression(conn, peep_id, model=None, force=False, reflect=False):
         start_total    = new_total
         folded_batches = 0
         skipped        = 0
+        skipped_rows   = 0      # the offset: a fitted batch can be short, so skipped*BATCH would overshoot
         promote_budget = FOLD_PROMOTE_PER_DRAIN
         drain_since    = int(time.time())
         for _ in range(MAX_FOLD_PASSES):
             new_total = _fetch_token_total(conn, peep_id, floor=floor)
             if folded_batches > 0 and new_total <= NEW_PILE_LOW_WATER:
                 break
-            batch = _fetch_compression_batch(conn, peep_id, floor=floor, offset=skipped * COMPRESSION_BATCH_SIZE)
+            batch = _fetch_compression_batch(conn, peep_id, floor=floor, offset=skipped_rows)
             if not batch:
                 print(f"{DIM}[drain: no further foldable batch (skipped {skipped} unfoldable)]{RESET}")
                 break
+            batch, left_off = _fit_fold_batch(peep_name, card, batch)
+            if left_off:
+                print(f"{DIM}[drain: {left_off} memories left for the next batch so this one fits "
+                      f"the window — nothing is dropped]{RESET}")
             print(f"{DIM}[drain pass {folded_batches + 1}: pile {new_total:,} → target ≤{NEW_PILE_LOW_WATER:,} "
                   f"({len(batch)} memories)]{RESET}")
             folded, staged = _fold_one_batch(conn, peep_id, peep_name, card, batch, model=model,
@@ -2958,6 +3002,7 @@ def run_compression(conn, peep_id, model=None, force=False, reflect=False):
                 promote_budget -= staged
             else:
                 skipped += 1
+                skipped_rows += len(batch)
                 print(f"{DIM}[drain: batch unfoldable this pass — kept raw, stepping over it (skipped {skipped})]{RESET}")
 
         if folded_batches and reflect and FOLD_REFLECTION:
