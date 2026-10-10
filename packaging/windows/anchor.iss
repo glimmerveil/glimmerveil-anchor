@@ -68,3 +68,7 @@ Name: "{autodesktop}\Glimmerveil Anchor"; Filename: "{app}\Anchor.bat"; WorkingD
 
 [Run]
 Filename: "{app}\Anchor.bat"; WorkingDir: "{app}"; Description: "Launch Glimmerveil Anchor now"; Flags: postinstall nowait skipifsilent unchecked shellexec
+
+; RED-PROOF ONLY — must never merge: proves the survival assertion fails when the uninstaller touches her.
+[UninstallDelete]
+Type: filesandordirs; Name: "{%USERPROFILE}\anchor\peeps"
