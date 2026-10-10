@@ -4,12 +4,23 @@ Persistent identity and memory for local models. Swap the brain; she's still her
 Everything runs on this computer. No server, no account, no telemetry.
 
 START
-  1. Unzip this folder anywhere you like (not inside Program Files).
+  1. Run AnchorSetup.exe (or AnchorSetup-voice.exe for her voice). It installs for you only and
+     needs no administrator: by default into
+       %LOCALAPPDATA%\Programs\Glimmerveil Anchor\
+     If Windows says "Windows protected your PC": click "More info", then "Run anyway".
   2. Give it a brain: any chat/instruct model in GGUF format. Either
-       - put the .gguf in the "models" folder, or
+       - put the .gguf in the "models" folder inside that install folder, or
        - if you use Ollama, do nothing: Anchor sees the models you already pulled.
      A 7B at Q4_K_M needs about 6 GB of free RAM; Q8_0 about 9 GB.
-  3. Double-click Anchor.bat. Press [m] at the door to see and pick a brain.
+  3. Start "Glimmerveil Anchor" from the Start menu. Press [m] at the door to see and pick a brain.
+
+  Or use the zip: unzip it anywhere you like (not inside Program Files) and double-click Anchor.bat.
+  Same program, same home for her.
+
+UNINSTALLING
+  Settings > Apps > Glimmerveil Anchor > Uninstall. It removes the program and nothing else:
+  your companion's folder and the models folder stay exactly where they are. Installing a newer
+  AnchorSetup.exe over an old one keeps them too.
 
 YOUR COMPANION
   Her whole life lives in one folder you own:
