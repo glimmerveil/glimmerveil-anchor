@@ -167,6 +167,82 @@ jobs:
           path: dist/GlimmerveilAnchor-voice-windows-x64.zip
           if-no-files-found: error
 
+  # The installer: AnchorSetup.exe (Inno Setup) from the same folder the zip is built from. Installed silently
+  # per-user, the first night driven through the INSTALLED Anchor.bat, installed again over itself (an upgrade),
+  # then uninstalled — and her folder (%USERPROFILE%\anchor\peeps) and models\ must be byte-for-byte as they were.
+  # Signed only when the ANCHOR_SIGN_COMMAND secret exists; otherwise an unsigned build, and it says so.
+  installer:
+    strategy:
+      fail-fast: false
+      matrix:
+        flavor: ["", "--voice"]
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      SIGN_SETUP_PRESENT: ${{ secrets.ANCHOR_SIGN_SETUP != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: build the Windows folder${{ matrix.flavor && ' (voice)' || '' }}
+        run: python ci/package_windows.py ${{ matrix.flavor }}
+      - name: Inno Setup 6 (the image's own if it has one, else chocolatey)
+        shell: pwsh
+        run: |
+          $iscc = @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if ($iscc) { "preinstalled: $iscc" } else { "not on the image; installing"; choco install innosetup -y --no-progress; if ($LASTEXITCODE) { exit $LASTEXITCODE } }
+          $iscc = @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          "ISCC $iscc  version $((Get-Item $iscc).VersionInfo.ProductVersion)"
+      # The signing switch: a no-op unless the secrets exist (forks and PRs never have them). See the PR / README_WINDOWS.
+      - name: prepare signing (only if ANCHOR_SIGN_SETUP is set)
+        if: env.SIGN_SETUP_PRESENT == 'true'
+        shell: pwsh
+        env:
+          ANCHOR_SIGN_SETUP: ${{ secrets.ANCHOR_SIGN_SETUP }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+        run: Invoke-Expression $env:ANCHOR_SIGN_SETUP
+      - name: build AnchorSetup${{ matrix.flavor && '-voice' || '' }}.exe
+        env:
+          ANCHOR_SIGN_COMMAND: ${{ secrets.ANCHOR_SIGN_COMMAND }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+        run: python ci/build_installer.py ${{ matrix.flavor }}
+      # Informational, never fails: what this runner's Defender says about the installer (SmartScreen has no UI here).
+      - name: Defender scan of the installer (informational)
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path "dist\AnchorSetup*.exe"
+          (Get-AuthenticodeSignature $exe).Status
+          Get-MpComputerStatus | Select-Object AMServiceEnabled, AntivirusEnabled, RealTimeProtectionEnabled, AntivirusSignatureVersion | Format-List
+          & "$env:ProgramFiles\Windows Defender\MpCmdRun.exe" -Scan -ScanType 3 -File "$exe" -DisableRemediation
+          "MpCmdRun exit $LASTEXITCODE (0 = no threat found, 2 = threat found)"
+      - name: install the pseudo-console
+        run: "python -m pip install --only-binary=:all: \"pywinpty>=2.0.13,<3\""
+      - name: install -> first night through the installed copy -> upgrade -> uninstall -> she survived
+        run: python ci/drive_installer.py dist\AnchorSetup${{ matrix.flavor && '-voice' || '' }}.exe
+      - name: keep the transcript and the setup logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drive-transcript-installer${{ matrix.flavor && '-voice' || '' }}
+          path: |
+            ci/.scratch_drive/transcript.txt
+            dist/setup-*.log
+          if-no-files-found: warn
+      - name: keep the installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnchorSetup${{ matrix.flavor && '-voice' || '' }}-windows-x64
+          path: dist/AnchorSetup${{ matrix.flavor && '-voice' || '' }}.exe
+          if-no-files-found: error
+
   # The Windows Forge = a bake of Anchor: the shell (Forge launcher, its own home, voice) is built here,
   # her brain is added outside CI (ci/forge_add_brain.py). This job adds the toy brain the same way and
   # drives the result, so the shell and the brain step are both proven before a real brain goes in.
