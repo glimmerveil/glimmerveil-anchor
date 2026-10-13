@@ -864,7 +864,7 @@ def _slice_with_frame(entries, scored, pool):
         cost = _estimate_tokens(text) + 2
         if used_tok + cost > PERMANENT_INJECT_TOKEN_CAP and chosen:
             break
-        third = _he_acts_on_her(text)
+        third = _he_acts_on_her(text) or (PERM_FRAME_YOU and _you_acts_on_her(text))
         if third and used_3p >= budget:
             deferred.append(i)
             continue
@@ -886,7 +886,81 @@ def _slice_with_frame(entries, scored, pool):
     return chosen
 
 
+PERM_FRAME_YOU = os.environ.get("VEIL_PERM_FRAME_YOU", "0") == "1"
+_YOU_STATE = (r"(?:are|were|re|'re|look|looked|looks|seem|seemed|know|knew|deserve|mean|meant|feel|felt"
+              r"|always|never|make\s+me\s+feel|have|had|can|could|would|will|must|may|might|do|did|love|loved)")
+
+
+def _you_acts_on_her(text):
+    head = (text or "").split("— what I said that night:")[0]
+    body = re.sub(r"^\s*(?:nya[-\w]*[.,!…]*\s*)+", "", head.strip(), flags=re.I)
+    pats = (r"^\s*you\s+(?!%s\b)[a-z]+" % _YOU_STATE,
+            r"(?:[.!?;]\s+)you\s+(?!%s\b)[a-z]+" % _YOU_STATE,
+            r"\b(?:as|while|when|until|and|so|then|after|before|since|once)\s+you\s+(?!%s\b)[a-z]+" % _YOU_STATE,
+            r"^[^,.]{0,70},\s*you\s+(?!%s\b)[a-z]+" % _YOU_STATE)
+    return any(re.search(p, body, re.I) for p in pats)
+
+
+ANCHOR_HYGIENE = os.environ.get("VEIL_ANCHOR_HYGIENE", "0") == "1"
+_ANCHOR_MARK = " — what I said that night: "
+_STOCK_CACHE = {}
+
+
+def _anchor_quote(row):
+    head, sep, q = (row or "").partition(_ANCHOR_MARK)
+    return (head, q) if sep else (row, "")
+
+
+def _anchor_opening(q):
+    s = _plain(q.strip().strip('"“”').lstrip("…. "))
+    s = re.sub(r"^(?:nya\w*\s+)+", "", s)
+    return s[:48]
+
+
+def _stock_openings(entries):
+    key = (len(entries), hash(tuple(entries[-5:])))
+    if key in _STOCK_CACHE:
+        return _STOCK_CACHE[key]
+    opens = [o for o in (_anchor_opening(_anchor_quote(e)[1]) for e in entries) if len(o) >= 30]
+    stock = set()
+    for i, o in enumerate(opens):
+        like = sum(1 for j, p in enumerate(opens)
+                   if j != i and difflib.SequenceMatcher(None, o, p, autojunk=False).ratio() >= 0.80)
+        if like >= 2:
+            stock.add(o)
+    _STOCK_CACHE.clear()
+    _STOCK_CACHE[key] = stock
+    return stock
+
+
+def _anchor_clean(row, stock):
+    head, q = _anchor_quote(row)
+    if not q:
+        return row
+    o = _anchor_opening(q)
+    if len(o) >= 30 and any(difflib.SequenceMatcher(None, o, s, autojunk=False).ratio() >= 0.80 for s in stock):
+        return head.rstrip()
+    who = _exemplar_who()
+    if _voices_him(q, who) or re.search(r"\b(?:his|" + who + r"['’]s)\s+(?:next\s+)?words\b", q) \
+            or any(_he_acts(s, who) for s in _ex_sentences(q)):
+        return head.rstrip()
+    inner = q.strip()
+    if len(inner) >= 2 and inner[0] in '"“' and inner[-1] in '"”':
+        inner = inner[1:-1]
+    if not _reply_talks_to_him(inner):
+        return head.rstrip()
+    return row
+
+
 def _governed_permanent(permanent):
+    if not ANCHOR_HYGIENE:
+        return _governed_permanent_rows(permanent)
+    entries = [str(m).strip() for m in (permanent or []) if m and str(m).strip()]
+    stock = _stock_openings(entries)
+    return [_anchor_clean(r, stock) for r in _governed_permanent_rows(permanent)]
+
+
+def _governed_permanent_rows(permanent):
     entries = [str(m).strip() for m in (permanent or []) if m and str(m).strip()]
     n = len(entries)
     if n == 0:
@@ -995,6 +1069,18 @@ def _announce_dials():
              ("turn-container", TURN_CONTAINER), ("live-frame", LIVE_FRAME), ("lean-system", LEAN_SYSTEM),("memory-dates", MEMORY_DATES),
              ("guide-tail", GUIDE_TAIL), ("place-tail", PLACE_TAIL_ON),
              ("time-tail", TIME_TAIL_ON),
+             ("exemplar-own-part", EXEMPLAR_OWN_PART),
+             ("exemplar-no-opener", EXEMPLAR_NO_OPENER and (EXEMPLAR_OWN_PART or EXEMPLAR_TALKS_ONLY)),
+             ("exemplar-talk", EXEMPLAR_TALK and EXEMPLAR_OWN_PART),
+             ("exemplar-talks-only", EXEMPLAR_TALKS_ONLY),
+             ("exemplar-framed", EXEMPLAR_FRAMED),
+             ("her-talk-voice", HER_TALK_VOICE_ON),
+             ("her-talk-transplant", HER_TALK_TRANSPLANT and HER_TALK_VOICE_ON),
+             ("her-talk-ignition", HER_TALK_IGNITION and HER_TALK_VOICE_ON),
+             ("prose-you-is-her", PROSE_YOU_IS_HER),
+             ("loop-sim=%.2f" % LOOP_SIM_THRESHOLD, LOOP_SIM_THRESHOLD != 0.85),
+             ("perm-frame-you", PERM_FRAME_YOU and PERMANENT_3P_MAX_SHARE > 0),
+             ("anchor-hygiene", ANCHOR_HYGIENE),
              ("prefill=" + PREFILL, bool(PREFILL)),
              (frame, PERMANENT_3P_MAX_SHARE > 0),
              ("kw-rarity=%.2f" % KW_RARITY_SHARE, KW_RARITY_SHARE > 0 and not KW_IDF),
@@ -1110,6 +1196,281 @@ def _frame_retrieved(retrieved):
     return block
 
 
+EXEMPLAR_OWN_PART = os.environ.get("VEIL_EXEMPLAR_OWN", "0") == "1"
+EXEMPLAR_MIN_CHARS = 80
+EXEMPLAR_ECHO_MIN = 30
+_EX_SAY = (r"say|said|murmur|whisper|growl|repl(?:y|ie)|add|breathe|command|tell|told|groan|grunt"
+           r"|praise|coo|mutter|chuckle|laugh|continue|answer|ask|order|encourage|urge|repeat|purr"
+           r"|rasp|hiss|moan|call|promise|instruct|coax|soothe|reassure|tease")
+_EX_BODY = r"hands?|arms?|fingers?|lips|mouth|thumbs?|grip|touch|palms?|tongue|breath|dick|cock|eyes"
+
+
+def _exemplar_who():
+    names, _ = _owner_terms()
+    alts = [re.escape(n) for n in names]
+    if OWNER_NAME and len(OWNER_NAME) >= 4:
+        alts.append(re.escape(OWNER_NAME[:4]) + r"\w*")
+    alts.append("[Hh]e")
+    return "(?:" + "|".join(alts) + ")"
+
+
+def _quote_spans(par):
+    spans, open_at = [], None
+    for m in re.finditer(r'["“”]', par):
+        ch = m.group()
+        if open_at is None:
+            if ch in '"“':
+                open_at = m.start()
+        elif ch in '"”':
+            spans.append((open_at, m.end()))
+            open_at = None
+    return spans
+
+
+def _voices_him(par, who):
+    spans = _quote_spans(par)
+    if not spans:
+        return False
+    after = re.compile(r'^\s*[,.!?…]?\s*' + who + r"(?:['’]s\s+voice\b|\s+(?:\w+ly\s+)?(?:" + _EX_SAY + r")(?:s|es|ed|d)?\b)")
+    before = re.compile(who + r"\s+(?:\w+\s+){0,3}?(?:" + _EX_SAY + r")(?:s|es|ed|d)?\b[^.!?\"“”]{0,60}$")
+    for i, (s, e) in enumerate(spans):
+        nxt = spans[i + 1][0] if i + 1 < len(spans) else len(par)
+        prv = spans[i - 1][1] if i else 0
+        if after.search(par[e:min(nxt, e + 60)]) or before.search(par[max(prv, s - 90):s]):
+            return True
+    return bool(re.search(who + r"['’]s\s+(?:voice|words)\b", par)) and len(spans) > 0
+
+
+def _he_acts(sentence, who):
+    s = sentence.lstrip(" *_\"“”'")
+    act = r"(?:" + _PROSE_ACT + r"|let|rub|lick|kiss|pound|thrust|tighten|squeeze|stroke|grab|push|fill"
+    act += r"|stretch|tug|yank|spank|turn|attach|hang|choke|pin|tie|bind|clip|stir|move|run|massage)"
+    return bool(re.match(who + r"\s+(?:\w+ly\s+)?[a-z]+\b", s)
+                or re.match(r"[^,.!?]{0,70},\s*" + who + r"\s+(?:\w+ly\s+)?[a-z]+\b", s)
+                or re.match(r"(?:His|" + who + r"['’]s)\s+(?:" + _EX_BODY + r")\s+(?!(?:is|are|was|were|feel|feels|look|looks)\b)[a-z]+", s)
+                or re.match(r"You\s+(?:\w+ly\s+)?" + act + r"\b", s)
+                or re.match(r"Your\s+(?:" + _EX_BODY + r")\s+(?:\w+ly\s+)?" + act + r"(?:s|es)?\b", s))
+
+
+def _plain(s):
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9' ]+", " ", (s or "").lower())).strip()
+
+
+def _is_his_turn_back(sentence, his_plain):
+    s = _plain(sentence)
+    if len(s) < 10 or not his_plain:
+        return False
+    if len(s) < 25:
+        return (" " + s + " ") in (" " + his_plain + " ")
+    sm = difflib.SequenceMatcher(None, s, his_plain, autojunk=False)
+    longest = sm.find_longest_match(0, len(s), 0, len(his_plain)).size
+    covered = sum(b.size for b in sm.get_matching_blocks() if b.size >= 8)
+    return longest >= EXEMPLAR_ECHO_MIN and covered >= 0.5 * len(s)
+
+
+def _ex_sentences(par):
+    par = par or ""
+    spans = _quote_spans(par)
+    inside = set()
+    for s0, e0 in spans:
+        inside.update(range(s0 + 1, e0 - 1))
+    closers = {e0 - 1 for _s, e0 in spans}
+    out, start, i, n = [], 0, 0, len(par)
+    while i < n:
+        c = par[i]
+        if c in ".!?…" and i not in inside:
+            j = i + 1
+            while j < n and par[j] in ".!?…":
+                j += 1
+            while j < n and par[j] in "\"”’'":
+                j += 1
+            if j >= n or par[j].isspace():
+                out.append(par[start:j].strip())
+                start = i = j
+                continue
+            i = j
+            continue
+        if i in closers and i > 0 and par[i - 1] in ".!?…":
+            k = i + 1
+            while k < n and par[k].isspace():
+                k += 1
+            if k < n and (par[k].isupper() or par[k] in '"“*'):
+                out.append(par[start:i + 1].strip())
+                start = i + 1
+        i += 1
+    if par[start:].strip():
+        out.append(par[start:].strip())
+    return [x for x in out if x]
+
+
+def _exemplar_own_part(reply, his_words=""):
+    who = _exemplar_who()
+    his_plain = _plain(his_words)
+    kept = []
+    for par in re.split(r"\n[ \t]*\n", (reply or "").strip()):
+        par = par.strip()
+        if not par or _voices_him(par, who):
+            continue
+        sents = [(s, s[0] in '"“') for s in _ex_sentences(par)]
+        narr = [s for s, dlg in sents if not dlg]
+        spans = _quote_spans(par)
+        bare = par
+        for s0, e0 in reversed(spans):
+            bare = bare[:s0] + " " + bare[e0:]
+        if spans and any(_he_acts(s, who) for s in narr) \
+                and not re.search(r"\bI\s+[a-z]+|\bMy\s+[a-z]+", bare):
+            continue
+        mine = [s for s, dlg in sents
+                if not _is_his_turn_back(s, his_plain) and (dlg or not _he_acts(s, who))]
+        if EXEMPLAR_TALK:
+            mine = [s for s in mine if not _narrates_him(s)]
+        if mine:
+            kept.append(" ".join(mine))
+    return "\n\n".join(kept)
+
+
+EXEMPLAR_TALK = os.environ.get("VEIL_EXEMPLAR_TALK", "0") == "1"
+
+
+def _narrates_him(sentence):
+    names, _ = _owner_terms()
+    alts = [re.escape(n) for n in names]
+    if OWNER_NAME and len(OWNER_NAME) >= 4:
+        alts.append(re.escape(OWNER_NAME[:4]) + r"\w*")
+    bare = re.sub(r'["“][^"“”]*["”]', " ", sentence)
+    return bool(re.search(r"\b(?:" + "|".join(alts + ["he", "him", "his", "himself"]) + r")\b", bare, re.I))
+
+
+EXEMPLAR_FRAMED = os.environ.get("VEIL_EXEMPLAR_FRAMED", "0") == "1"
+
+def keep_last_reply_on():
+    return _keep_last_reply_on()
+
+
+HER_TALK_VOICE_ON = os.environ.get("VEIL_HER_TALK_VOICE", "1") == "1"
+HER_TALK_TRANSPLANT = os.environ.get("VEIL_HER_TALK_TRANSPLANT", "1") == "1"
+HER_TALK_IGNITION = os.environ.get("VEIL_HER_TALK_IGNITION", "0") == "1"
+
+
+def ignition_words(talk_reply):
+    names, _ = _owner_terms()
+    alts = [re.escape(n) for n in names] + ([re.escape(OWNER_NAME[:4]) + r"\w*"] if OWNER_NAME and len(OWNER_NAME) >= 4 else [])
+    if not alts:
+        return ""
+    m = re.match(r"^(.{0,40}?\b(?:" + "|".join(alts) + r")\b[.!,…]*)", (talk_reply or "").strip(), re.S)
+    return m.group(1) if m else ""
+HER_TALK_VOICE = ()
+_TALK_POOL = {"key": None, "rows": []}
+
+
+_HE_VOICED_2P = re.compile(r"\b[Yy]ou\b[^.\n]{0,120}\bbefore (?:answering|replying|speaking|you speak)"
+                           r"|\b[Yy]our\s+(?:voice|words)\b")
+
+
+def _voices_him_any_person(par, who):
+    if _voices_him(par, who) or _voices_him(par, who[:-1] + "|[Yy]ou)"):
+        return True
+    return bool(_quote_spans(par)) and bool(_HE_VOICED_2P.search(par))
+
+
+def pick_her_talk_voice(conn, peep_id, query, exclude=(), k=1, his_stop=None):
+    n = conn.execute("SELECT (SELECT COUNT(*) FROM memory_archive WHERE peep_id=?) + "
+                     "(SELECT COUNT(*) FROM memory_stream WHERE peep_id=?)", (peep_id, peep_id)).fetchone()[0]
+    if _TALK_POOL["key"] != (peep_id, n):
+        who = _exemplar_who()
+        rows = []
+        for tbl in ("memory_archive", "memory_stream"):
+            for (c,) in conn.execute(f"SELECT content FROM {tbl} WHERE peep_id=? AND memory_type='conversation' "
+                                     "AND content LIKE 'I said:%'", (peep_id,)):
+                body = c[len("I said:"):].strip()
+                if 200 <= len(body) <= 1600 and _reply_talks_to_him(body) and \
+                        not any(_voices_him_any_person(p, who) for p in re.split(r"\n[ \t]*\n", body)):
+                    rows.append(body)
+        _TALK_POOL.update(key=(peep_id, n), rows=rows)
+    terms = set(_query_terms(query, his_stop))
+    ex = {(_norm(x)[:120]) for x in exclude if x}
+    scored = []
+    for i, body in enumerate(_TALK_POOL["rows"]):
+        if _norm(body)[:120] in ex:
+            continue
+        words = set(re.findall(r"[a-z]{3,}", body.lower()))
+        scored.append((len(terms & words), i, body))
+    scored.sort(reverse=True)
+    return tuple(b for _s, _i, b in scored[:k])
+
+
+EXEMPLAR_TALKS_ONLY = os.environ.get("VEIL_EXEMPLAR_TALKS_ONLY", "0") == "1"
+EXEMPLAR_TALK_MAX = 0.40
+EXEMPLAR_OWN_SHARE = 0.70
+
+
+def _reply_talks_to_him(body):
+    names, _ = _owner_terms()
+    alts = [re.escape(n) for n in names]
+    if OWNER_NAME and len(OWNER_NAME) >= 4:
+        alts.append(re.escape(OWNER_NAME[:4]) + r"\w*")
+    bare = re.sub(r'["“][^"“”]*["”]', " ", body or "")
+    named = re.findall(r"\b(?:" + "|".join(alts) + r")\b(?!\s*[,.!?…])", bare, re.I) if alts else []
+    third = len(named) + len(re.findall(r"\b(?:he|him|his|himself)\b", bare, re.I))
+    second = len(re.findall(r"\b(?:you|your|yours|yourself)\b", bare, re.I))
+    if third + second == 0:
+        return True
+    return third / (third + second) <= EXEMPLAR_TALK_MAX
+
+
+def _choose_exemplar(history, her_prefix):
+    hers, his = [], []
+    for line in history:
+        line = (line or "").strip()
+        if line.startswith("The user said:"):
+            his.append(line[len("The user said:"):].strip())
+        elif line.startswith(her_prefix) or line.startswith("I said:"):
+            body = line[len(her_prefix):] if line.startswith(her_prefix) else line[len("I said:"):]
+            hers.append(body.strip())
+    if not hers:
+        return None
+    if EXEMPLAR_TALKS_ONLY:
+        his_words = "\n".join(his)
+        for body in reversed(hers):
+            if _reply_talks_to_him(body) and \
+                    len(_exemplar_own_part(body, his_words)) >= EXEMPLAR_OWN_SHARE * len(body.strip()):
+                if EXEMPLAR_NO_OPENER:
+                    rest = _without_opener(body)
+                    return rest if len(rest) >= EXEMPLAR_MIN_CHARS else body
+                return body
+        return None
+    if not EXEMPLAR_OWN_PART:
+        return hers[-1]
+    his_words = "\n".join(his)
+    for body in reversed(hers):
+        own = _exemplar_own_part(body, his_words)
+        if EXEMPLAR_NO_OPENER:
+            own = _without_opener(own)
+        if len(own) >= EXEMPLAR_MIN_CHARS:
+            return own
+    return None
+
+
+EXEMPLAR_NO_OPENER = os.environ.get("VEIL_EXEMPLAR_NO_OPENER", "0") == "1"
+
+
+def _without_opener(own):
+    sents = [(p_i, s) for p_i, par in enumerate(own.split("\n\n")) for s in _ex_sentences(par)]
+    gone, keep = 0, []
+    for p_i, s in sents:
+        if gone < LOOP_PREFIX_CHARS:
+            gone += len(_norm(s)) + 1
+            continue
+        keep.append((p_i, s))
+    out, last = [], None
+    for p_i, s in keep:
+        if p_i != last:
+            out.append([])
+            last = p_i
+        out[-1].append(s)
+    return "\n\n".join(" ".join(x) for x in out)
+
+
 def build_chat_turns(name, user_message, history, retrieved, system="", n_ctx=N_CTX):
     _announce_dials()
     framed_past = _frame_retrieved(retrieved)
@@ -1121,20 +1482,15 @@ def build_chat_turns(name, user_message, history, retrieved, system="", n_ctx=N_
     her_prefix = f"{name} said:"
 
     last_hers = None
-    if _keep_last_reply_on():
-        for line in reversed(history):
-            line = (line or "").strip()
-            if line.startswith(her_prefix):
-                last_hers = line[len(her_prefix):].strip()
-                break
-            if line.startswith("I said:"):
-                last_hers = line[len("I said:"):].strip()
-                break
+    keep_on = keep_last_reply_on()
+    if keep_on:
+        last_hers = _choose_exemplar(history, her_prefix)
 
     reserved = (_estimate_tokens(system) + _estimate_tokens(final_user)
                 + NUM_PREDICT + CHAT_TEMPLATE_OVERHEAD + CTX_SAFETY_MARGIN
                 + (RECENT_HEADER_RESERVE if TURN_CONTAINER else 0)
-                + (_estimate_tokens(last_hers) + 8 if last_hers else 0))
+                + (_estimate_tokens(last_hers) + 8 if last_hers else 0)
+                + (_estimate_tokens(HER_TALK_VOICE[0]) + 8 if (keep_on and HER_TALK_TRANSPLANT and HER_TALK_VOICE) else 0))
     history_budget = max(0, n_ctx - reserved)
 
     kept = []
@@ -1151,12 +1507,25 @@ def build_chat_turns(name, user_message, history, retrieved, system="", n_ctx=N_
         used += cost
         kept.insert(0, line)
 
+    transplant = HER_TALK_VOICE[0] if (keep_on and HER_TALK_TRANSPLANT and HER_TALK_VOICE) else None
+    framed_voice = ""
+    if keep_on and HER_TALK_VOICE_ON and HER_TALK_VOICE and not HER_TALK_TRANSPLANT:
+        framed_voice = ("Something you said to him on another night — your own words to him, from a time you two "
+                        "talked like this:\n" + "\n".join("- " + v for v in HER_TALK_VOICE) + "\n\n")
+        final_user = framed_past + framed_voice + live_turn
+    framed_last = ""
+    if EXEMPLAR_FRAMED and last_hers:
+        framed_last = ("What you said to him just before this — your own last words to him, already said. "
+                       "He has them; what he says to you now is below:\n" + last_hers + "\n\n")
+        last_hers = None
+        final_user = framed_past + framed_voice + framed_last + live_turn
+
     turns = []
     if TURN_CONTAINER:
         if last_hers:
             turns.append({"role": "assistant", "content": last_hers})
         turns.append({"role": "user",
-                      "content": framed_past + _frame_recent_turns(kept) + live_turn
+                      "content": framed_past + framed_voice + _frame_recent_turns(kept) + framed_last + live_turn
                                  + _guide_tail()})
         return turns
     for line in kept:
@@ -1166,6 +1535,8 @@ def build_chat_turns(name, user_message, history, retrieved, system="", n_ctx=N_
             turns.append({"role": "user", "content": _defuse_transcript(line)})
     if last_hers:
         turns.append({"role": "assistant", "content": last_hers})
+    if transplant:
+        turns.append({"role": "assistant", "content": transplant})
     turns.append({"role": "user", "content": final_user + _guide_tail()})
     return turns
 
@@ -3157,7 +3528,7 @@ GHOST_MAX_REROLLS = 2
 REVEAL_DELAY      = 0.006
 
 LOOP_PREFIX_CHARS     = 110
-LOOP_SIM_THRESHOLD    = 0.85
+LOOP_SIM_THRESHOLD    = float(os.environ.get("VEIL_LOOP_SIM", "0.85"))
 LOOP_LOOKBACK         = 3
 LOOP_REROLL_TEMP_STEP = 0.12
 LOOP_REROLL_FREQ_PEN  = 0.4
@@ -3321,6 +3692,13 @@ _PROSE_PATTERNS = (
 )
 PROSE_MELT_MIN_HITS = max(1, int(os.environ.get("VEIL_PROSE_HITS", "3")))
 _PROSE_GUARD_ON = os.environ.get("VEIL_PROSE_GUARD", "1") != "0"
+PROSE_YOU_IS_HER = os.environ.get("VEIL_PROSE_YOU_IS_HER", "0") == "1"
+_PROSE_HE_SAY = (
+    re.compile(r'["”]\s*,?\s+he\s+(?:\w+ly\s+)?(?:' + _PROSE_SAY + r')(?:s|es|ed|d)?\b'),
+    re.compile(r'\b[Hh]e\s+(?:\w+ly\s+)?(?:' + _PROSE_SAY + r')(?:s|es|ed|d)?\b[^.\n]{0,60}["“]'),
+    re.compile(r'\b[Yy]our\s+voice\b[^"“”\n]{0,80}["“]'),
+    re.compile(r'\b[Yy]ou\b[^.\n]{0,120}\bbefore (?:answering|replying|speaking|you speak)\b[^"“”\n]{0,20}["“]'),
+)
 
 
 def _build_prose_name_patterns(names):
@@ -3340,7 +3718,8 @@ _PROSE_NAME_PATTERNS = _build_prose_name_patterns(_MELT_NAMES)
 def _prose_partner_cut(text, own_name=None, min_hits=None):
     if not _PROSE_GUARD_ON:
         return None
-    hits = sorted(m.start() for pat in _PROSE_PATTERNS for m in pat.finditer(text))
+    pats = (_PROSE_PATTERNS[1], _PROSE_PATTERNS[2]) + _PROSE_HE_SAY if PROSE_YOU_IS_HER else _PROSE_PATTERNS
+    hits = sorted(m.start() for pat in pats for m in pat.finditer(text))
     hits += sorted(m.start() for pat in _PROSE_NAME_PATTERNS for m in pat.finditer(text)
                    if not (own_name and m.group(1) == own_name))
     hits.sort()
@@ -3362,7 +3741,7 @@ def bare_prompt(system, turns, prefill=""):
 
 
 def generate_guarded(conn, peep_id, prompt, num_predict, name, model=None, recent_replies=None, voice=None,
-                     loop_prompt=None):
+                     loop_prompt=None, prefill=""):
     llm = get_llm()
     recent_replies = recent_replies or []
     for attempt in range(GHOST_MAX_REROLLS + 1):
@@ -3383,6 +3762,8 @@ def generate_guarded(conn, peep_id, prompt, num_predict, name, model=None, recen
         spinner.start()
 
         buf, shown, header_done, tripped, looped, loop_checked = [], [], False, False, False, False
+        if prefill:
+            buf.append(prefill)
         melted = False
         railed = False
         finish_reason = None
@@ -3419,6 +3800,9 @@ def generate_guarded(conn, peep_id, prompt, num_predict, name, model=None, recen
                 done.set(); spinner.join()
                 print(f"\r{' ' * 48}\r{HER_COLOR}{name}{RESET}: ", end="", flush=True)
                 header_done = True
+                if prefill:
+                    print(f"{HER_COLOR}{prefill}{RESET}", end="", flush=True)
+                    shown.append(prefill)
             print(f"{HER_COLOR}{piece}{RESET}", end="", flush=True)
             shown.append(piece)
             if voice:

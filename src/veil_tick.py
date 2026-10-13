@@ -980,6 +980,9 @@ def _maybe_first_wake_ritual(conn, peep_id, peep, permanent, name, history, mode
         pass
 
 
+_HER_REPLIES_SINCE_WAKE = 0
+
+
 def chat_turn(conn, peep_id, peep, permanent, name, history, user_input, model, voice_streamer, meter):
     her_prefix = name + " said:"
     prev_place = _place()
@@ -1019,13 +1022,34 @@ def chat_turn(conn, peep_id, peep, permanent, name, history, user_input, model, 
     if _tt_last and _tt_now > _tt_last:
         spine.TIME_TAIL += (f" {YOUR_NAME} last spoke to you "
                             f"{_humanize_elapsed(_tt_now - _tt_last)} ago.")
+    spine.HER_TALK_VOICE = ()
+    if getattr(spine, "HER_TALK_VOICE_ON", False) and spine.keep_last_reply_on():
+        try:
+            spine.HER_TALK_VOICE = spine.pick_her_talk_voice(
+                conn, peep_id, user_input, exclude=[l.split(" said:", 1)[-1] for l in history[-spine.ECHO_GUARD_LINES:]],
+                his_stop=spine._his_stopwords(conn, peep_id))
+        except Exception:
+            spine.HER_TALK_VOICE = ()
     if not spine.LEAN_SYSTEM:
         system = system + "\n\n" + _time_block(conn, peep_id)
     turns = spine.build_chat_turns(name, user_input, history, retrieved, system=system, n_ctx=spine.N_CTX)
-    prompt = spine.render_chat_turns(system, turns, prefill=spine.CHAT_ASSISTANT_PREFILL)
+    global _HER_REPLIES_SINCE_WAKE
+    ignition = ""
+    if getattr(spine, "HER_TALK_IGNITION", False) and getattr(spine, "HER_TALK_VOICE", ()) \
+            and _HER_REPLIES_SINCE_WAKE == 0:
+        ignition = spine.ignition_words(spine.HER_TALK_VOICE[0])
+    prompt = spine.render_chat_turns(system, turns, prefill=ignition or spine.CHAT_ASSISTANT_PREFILL)
+    if os.environ.get("VEIL_TRACE_PROMPT"):
+        try:
+            with open(os.environ["VEIL_TRACE_PROMPT"], "a", encoding="utf-8") as _tf:
+                _tf.write(f"\n\n######## PROMPT {time.strftime('%H:%M:%S')} ########\n{prompt}")
+        except OSError:
+            pass
     response = spine.generate_guarded(conn, peep_id, prompt, spine.NUM_PREDICT, name, model=model,
                                       recent_replies=recent_replies, voice=voice_streamer,
-                                      loop_prompt=spine.bare_prompt(system, turns, spine.CHAT_ASSISTANT_PREFILL))
+                                      loop_prompt=spine.bare_prompt(system, turns, spine.CHAT_ASSISTANT_PREFILL),
+                                      **({"prefill": ignition} if ignition else {}))
+    _HER_REPLIES_SINCE_WAKE += 1
     if not response:
         print(f"{DIM}[{name} is quiet.]{RESET}")
         return (None, None)
@@ -1097,11 +1121,12 @@ def _should_hold(last_chat_ts):
 
 
 def run(db_path=None):
-    global _WOKE_AT, _VOICE_STREAMER
+    global _WOKE_AT, _VOICE_STREAMER, _HER_REPLIES_SINCE_WAKE
     import veil_paths
     veil_paths.utf8_console()
     veil_paths.refuse_forge_env()
     _WOKE_AT = time.time()
+    _HER_REPLIES_SINCE_WAKE = 0
     db = db_path or spine.DEFAULT_DB
     conn = spine.open_db(db)
     if not spine._acquire_single_instance_lock(conn):

@@ -7,7 +7,11 @@ os.environ.update({k: v for k, v in (
     ("VEIL_DIARY_ROWS_PER_TURN", "2"), ("VEIL_FOLD_TO_DIARY", "1"),
     ("VEIL_FOLD_REFLECTION", "1"), ("VEIL_TURN_CONTAINER", "1"), ("VEIL_GUIDE_TAIL", "1"),
     ("VEIL_MEMORY_DATES", "1"), ("VEIL_PREFILL", "*"),
-    ("VEIL_TIME_TAIL", "1"), ("VEIL_KEEP_LAST_REPLY", "1"), ("VEIL_LIVE_FRAME", "1"), ("VEIL_LEAN_SYSTEM", "1"))})
+    ("VEIL_TIME_TAIL", "1"), ("VEIL_KEEP_LAST_REPLY", "1"), ("VEIL_LIVE_FRAME", "1"), ("VEIL_LEAN_SYSTEM", "1"),
+    ("VEIL_EXEMPLAR_OWN", "1"), ("VEIL_EXEMPLAR_NO_OPENER", "1"), ("VEIL_PERM_FRAME_YOU", "1"),
+    ("VEIL_ANCHOR_HYGIENE", "1"), ("VEIL_EXEMPLAR_TALK", "1"), ("VEIL_EXEMPLAR_TALKS_ONLY", "1"),
+    ("VEIL_EXEMPLAR_FRAMED", "1"), ("VEIL_HER_TALK_VOICE", "1"), ("VEIL_HER_TALK_TRANSPLANT", "1"),
+    ("VEIL_HER_TALK_IGNITION", "1"), ("VEIL_PROSE_YOU_IS_HER", "1"), ("VEIL_LOOP_SIM", "0.95"))})
 import veil_spine as spine
 
 tree = ast.parse(open(os.path.join(SRC, "veil_spine.py")).read())
