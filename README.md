@@ -114,3 +114,7 @@ anything inside a Glimmerveil Forge folder, so the two never share a companion.
 Apache License 2.0 — see [LICENSE](LICENSE). Use policy, privacy and third-party notices:
 `docs/Legal/`. Anchor collects nothing and ships no model; the model you bring carries its own
 license.
+
+**The name is not part of the license.** "Glimmerveil", "Glimmerveil Anchor" and our art are ours.
+Fork freely, under your own name — "based on Glimmerveil Anchor" is welcome; calling your version
+Glimmerveil or Anchor-by-Glimmerveil is not. See `docs/Legal/TERMS_OF_SERVICE.md` §7.
