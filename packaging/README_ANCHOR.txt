@@ -42,11 +42,15 @@ character. Coder models are for code, not companions.
 STEP 2 — START ANCHOR
 ---------------------
   WINDOWS
-    1. Unzip the Anchor zip somewhere you like (not inside Program Files).
-    2. Put your .gguf file in the "models" folder inside it.
-    3. Double-click Anchor.bat.
+    1. Run AnchorSetup.exe. It installs for you only (no administrator needed), into
+       %LOCALAPPDATA%\Programs\Glimmerveil Anchor\
        If Windows says "Windows protected your PC": click "More info", then "Run anyway".
        (The files aren't signed with a paid certificate; that's all the warning means.)
+    2. Put your .gguf file in the "models" folder inside that install folder.
+    3. Start "Glimmerveil Anchor" from the Start menu.
+    Using the zip instead? Unzip it somewhere you like (not inside Program Files), put the .gguf in
+    its "models" folder, and double-click Anchor.bat.
+    Uninstalling (Settings > Apps) removes the program only: her folder and your models stay.
 
   LINUX (and Steam Deck desktop mode)
     1. Put the .AppImage anywhere, and your .gguf in the folder ~/anchor/models
