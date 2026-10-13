@@ -28,6 +28,8 @@ def run():
               if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
               and isinstance(n.func.value, ast.Name) and n.func.value.id == "veil_legal"}
     ck("no gate at the door: the game calls only the legal menu", called == {"show_legal_menu"})
+    ck("Anchor's own legal module carries no gate (a gate arrives only with a product that ships one)",
+       not hasattr(L, "require_acceptance"))
 
     print()
     if fails:

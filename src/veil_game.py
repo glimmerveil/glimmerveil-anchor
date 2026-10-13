@@ -314,6 +314,9 @@ def main():
     import veil_paths
     veil_paths.utf8_console()
     veil_paths.refuse_forge_env()
+    gate = getattr(veil_legal, "require_acceptance", None)
+    if gate is not None and not gate():
+        return 0
     while True:
         _clear()
         _banner()

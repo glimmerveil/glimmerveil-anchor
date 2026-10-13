@@ -59,7 +59,16 @@ you run is yours to choose, and its license is yours to follow.
 
 Anchor collects nothing and makes no network connections. See `PRIVACY_POLICY.md`.
 
-## 7. No warranty, no liability
+## 7. Our name
+
+"Glimmerveil", "Glimmerveil Anchor", "Glimmerveil Forge", our logo and our cover art are ours. The Apache
+License covers the **code**; it does **not** give you our names or marks (section 6 of the license says so).
+
+You're welcome to fork Anchor, change it and share your version — **under your own name**. Please don't call
+your version Glimmerveil or Glimmerveil Anchor, don't use our logo or art for it, and don't present it as made,
+endorsed or supported by us. Saying plainly that it is *based on Glimmerveil Anchor* is fine, and appreciated.
+
+## 8. No warranty, no liability
 
 Anchor is provided **"as is", without warranties or conditions of any kind**, and without liability,
 exactly as set out in sections 7 and 8 of the Apache License 2.0.
@@ -68,4 +77,4 @@ exactly as set out in sections 7 and 8 of the Apache License 2.0.
 
 *Short version: companions are fiction and never advice; the minors line, real-world violence and
 self-harm are never permitted; you author your companions and you're responsible for them; Anchor
-collects nothing; it comes as-is.*
+collects nothing; fork it under your own name, not ours; it comes as-is.*
