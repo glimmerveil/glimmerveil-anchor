@@ -71,7 +71,7 @@ def status(folder, db_path):
 def measured_secs(folder):
     try:
         with open(os.path.join(folder, TIMING_NAME), encoding="utf-8") as f:
-            secs = [float(s) for s in json.load(f).get("pass_seconds", []) if s]
+            secs = [float(s) for s in json.load(f).get("pass_seconds", []) if s is not None]
     except (OSError, ValueError, TypeError):
         return None
     if not secs:
@@ -87,7 +87,8 @@ def _remember(folder, seconds):
             data = json.load(f)
     except (OSError, ValueError):
         data = {}
-    data["pass_seconds"] = (list(data.get("pass_seconds", [])) + [round(seconds, 1)])[-40:]
+    # 3 places: a fast machine's pass is still a MEASUREMENT — rounded to 0.0 it read as "not timed yet" (CI, 10-17)
+    data["pass_seconds"] = (list(data.get("pass_seconds", [])) + [round(seconds, 3)])[-40:]
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f)
 
@@ -114,7 +115,7 @@ def settle(conn, peep_id, spine, model, folder, say=print, stop=None):
             return done, left
         each = measured_secs(folder)
         say(f"[settling: pass {done + 1} of about {done + left} · {pile:,} tokens still to fold · "
-            + (f"{human(each * left)} left on this machine]" if each else "timing this pass on this machine]"))
+            + (f"{human(each * left)} left on this machine]" if each is not None else "timing this pass on this machine]"))
         t = time.time()
         saved = spine.MAX_FOLD_PASSES
         spine.MAX_FOLD_PASSES = 1
@@ -159,7 +160,7 @@ def main():
         print(f"\n{name} has {pile:,} tokens of her past still to fold: about {left} passes.")
         print("Each pass reads 25 of her memories and folds them into her own words; on an ordinary computer "
               "one pass takes several minutes, so this is HOURS.")
-        if each:
+        if each is not None:
             print(f"Timed on THIS machine: {human(each)} a pass — {human(each * left)} in all.")
         else:
             print("The first pass is timed on this machine, and from then on you'll see how long is left.")

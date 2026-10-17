@@ -72,6 +72,10 @@ check("a smaller core leaves a pile, and the door can count the passes before an
       pile > spine.NEW_PILE_HIGH_WATER and est > 10, (pile, est))
 st = veil_settle.status(d, db)
 check("the door's status is read-only and agrees", st["passes"] == est and st["secs_per_pass"] is None, st)
+_fast = tempfile.mkdtemp(dir=d)
+veil_settle._remember(_fast, 0.0004)
+check("a pass faster than a tenth of a second is still a MEASUREMENT (CI runners fold the fake in ~0 s)",
+      veil_settle.measured_secs(_fast) is not None, veil_settle.measured_secs(_fast))
 check("before any pass is timed, the estimate says so instead of guessing",
       "unknown" in veil_settle.human(None))
 

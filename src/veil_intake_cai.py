@@ -422,18 +422,19 @@ def read_cai_official(path, her=None, you=None):
     except zipfile.BadZipFile as e:
         _refuse("not a valid zip file: %s" % e)
 
-    json_names = [n for n in zf.namelist() if n.lower().endswith(".json")]
-    if not json_names:
-        _refuse("no .json file found inside the zip.")
+    with zf:            # closed on EVERY path, refusals too: an open zip is LOCKED on Windows (CI, 10-17)
+        json_names = [n for n in zf.namelist() if n.lower().endswith(".json")]
+        if not json_names:
+            _refuse("no .json file found inside the zip.")
 
-    data = None
-    for name in json_names:
-        try:
-            with zf.open(name) as f:
-                data = json.loads(f.read().decode("utf-8-sig"))
-            break
-        except Exception:
-            continue
+        data = None
+        for name in json_names:
+            try:
+                with zf.open(name) as f:
+                    data = json.loads(f.read().decode("utf-8-sig"))
+                break
+            except Exception:
+                continue
     if data is None:
         _refuse("could not parse any .json file inside the zip.")
 

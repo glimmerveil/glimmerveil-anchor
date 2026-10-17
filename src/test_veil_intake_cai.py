@@ -343,6 +343,26 @@ with tempfile.TemporaryDirectory(dir=_CACHE if os.path.isdir(_CACHE) else None) 
     check("official her=: set_aside_speakers", meta4m.get("set_aside_speakers") == ["Elara"],
           meta4m.get("set_aside_speakers"))
 
+    # 10-17 CI (windows): the official reader left the zip OPEN — on Windows an open file is LOCKED (this temp dir
+    # could not be removed; a person's own export would stay locked while Anchor runs). Every path must close it.
+    _real_zip, _opened = zipfile.ZipFile, []
+
+    class _Spy(_real_zip):
+        def __init__(self, *a, **k):
+            super().__init__(*a, **k)
+            _opened.append(self)
+    zipfile.ZipFile = _Spy
+    try:
+        try:
+            R.read_cai_official(ozm)
+        except ValueError:
+            pass
+        R.read_cai_official(ozm, her="Nell")
+    finally:
+        zipfile.ZipFile = _real_zip
+    check("official zip: CLOSED on every path (refused and read) — an open zip is locked on Windows",
+          len(_opened) == 2 and all(z.fp is None for z in _opened), [z.fp for z in _opened])
+
 if fails:
     print("\n  %d check(s) failed" % len(fails))
     sys.exit(1)
