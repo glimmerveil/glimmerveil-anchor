@@ -136,7 +136,51 @@ def _pick_model():
     input(f"{DIM}(Enter to go back){RESET}")
 
 
-def _wake():
+def _settle_status(active):
+    try:
+        import veil_settle
+        return veil_settle.status(active["folder_path"], active["db"])
+    except Exception:
+        return {"pile": 0, "passes": 0, "secs_per_pass": None}
+
+
+def _settle_estimate(st):
+    import veil_settle
+    if st.get("secs_per_pass"):
+        return (f"about {st['passes']} passes — {veil_settle.human(st['secs_per_pass'] * st['passes'])} "
+                "on this machine (timed here)")
+    return (f"about {st['passes']} passes — on an ordinary computer each takes several minutes, so this is "
+            "HOURS (the first pass is timed on this machine, and then you'll see how long is left)")
+
+
+def _settle():
+    import veil_paths
+    if not os.path.isfile(veil_paths.model_path()):
+        print(f"{DIM}No brain yet — press [m] to pick a model (.gguf) first; settling needs her brain.{RESET}")
+        time.sleep(2)
+        return
+    path = os.path.join(HERE, "veil_settle.py")
+    if not os.path.isfile(path):
+        path += "c"
+    subprocess.run([sys.executable, path])
+    input(f"{DIM}(Enter to go back){RESET}")
+
+
+def _offer_settle(active, st):
+    """The founder's ruling: settling is an OPTION, it says how long, and it resumes either way."""
+    p = _peep_pronouns(active)
+    name = active.get("name", active["folder"])
+    print(f"\n{BOLD}{name} has a long past to settle into.{RESET} The part of it you didn't make "
+          f"{p.poss} core is ordinary memory {p.poss} fold works through — {_settle_estimate(st)}.")
+    print(f"  {BOLD}[f]{RESET} let {p.obj} settle now — leave it running; Ctrl-C stops safely, and [f] resumes. "
+          f"What {p.subj} fold{p.s} while settling goes straight into {p.poss} permanent memory — there is no "
+          f"review window, because nobody is awake to read one")
+    print(f"  {BOLD}[w]{RESET} wake {p.obj} anyway — {p.subj} fold{p.s} a little at each pause until {p.subj}'"
+          f"{'re' if p.subj == 'they' else 's'} caught up, and [f] settles the rest any time")
+    return input(f"  {DIM}(Enter = back to the door){RESET} > ").strip().lower()
+
+
+def _wake(skip_settle_check=False):
     active = veil_roster.active_peep()
     if not active:
         print(f"{DIM}No one to wake — create your companion first.{RESET}")
@@ -147,6 +191,15 @@ def _wake():
         print(f"{DIM}No brain yet — press [m] to pick a model (.gguf), then wake.{RESET}")
         time.sleep(2)
         return
+    if not skip_settle_check:
+        st = _settle_status(active)
+        if st["passes"]:
+            pick = _offer_settle(active, st)
+            if pick == "f":
+                _settle()
+                return
+            if pick != "w":
+                return
     p = _peep_pronouns(active)
     card_path = os.path.join(active["folder_path"], veil_roster.CARD_NAME)
     if os.path.isfile(card_path):
@@ -304,9 +357,20 @@ def _import():
         if not src:
             return
     try:
-        veil_roster.import_peep(src)
+        ok, msg = veil_roster.import_peep(src)
     except Exception as e:
-        print(f"{DIM}{e}{RESET}")
+        ok, msg = False, str(e)
+    print(msg)
+    if ok:
+        active = veil_roster.active_peep()
+        st = _settle_status(active) if active else {"passes": 0}
+        if st["passes"]:
+            pick = _offer_settle(active, st)
+            if pick == "f":
+                _settle()
+            elif pick == "w":
+                _wake(skip_settle_check=True)
+            return
     input(f"{DIM}(Enter to go back){RESET}")
 
 
@@ -328,6 +392,11 @@ def main():
         else:
             active_e = next((e for e in entries if e.get("is_active")), None)
             wake_word = f"wake {_peep_pronouns(active_e).obj}" if active_e else "wake"
+            active_r = veil_roster.active_peep() if active_e else None
+            settle_st = _settle_status(active_r) if active_r else {"passes": 0}
+            if settle_st["passes"]:
+                print(f"\n{BOLD}  [f]{RESET} let {_peep_pronouns(active_e).obj} settle into "
+                      f"{_peep_pronouns(active_e).poss} past — {_settle_estimate(settle_st)}")
             print(f"\n{BOLD}  [w]{RESET} {wake_word} (or just Enter)   {BOLD}[c]{RESET} create   "
                   f"{BOLD}[s]{RESET} switch   {BOLD}[e]{RESET} export .veil   "
                   f"{BOLD}[i]{RESET} import   {BOLD}[r]{RESET} restore   {BOLD}[m]{RESET} model   {BOLD}[g]{RESET} gpu   "
@@ -362,6 +431,10 @@ def main():
             _export()
         elif entries and choice == "r":
             _restore()
+        elif entries and choice == "f":
+            active_r = veil_roster.active_peep()
+            if active_r and _settle_status(active_r)["passes"]:
+                _settle()
 
 
 if __name__ == "__main__":

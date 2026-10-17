@@ -1085,6 +1085,8 @@ def _announce_dials():
              (frame, PERMANENT_3P_MAX_SHARE > 0),
              ("kw-rarity=%.2f" % KW_RARITY_SHARE, KW_RARITY_SHARE > 0 and not KW_IDF),
              ("his-rows=%d" % HIS_ROWS_PER_TURN, HIS_ROWS_PER_TURN >= 0),
+             ("her-past=%d" % HER_PAST_PER_TURN, True),
+             ("her-past-in-system", her_past_in_system()),
              ("inject-cooldown=%d" % INJECT_COOLDOWN_TURNS, INJECT_COOLDOWN_TURNS > 0),
              ("content-match", CONTENT_MATCH),
              ("query-floor=%d" % QUERY_WORD_FLOOR, QUERY_WORD_FLOOR != 4),
@@ -1097,7 +1099,8 @@ def _announce_dials():
              ("one-of-each", DIARY_ONE_OF_EACH),
              ("fold-reflection", FOLD_REFLECTION),
              ("fold-fit-batch", FOLD_FIT_BATCH),
-             ("fold-fit-margin=%d" % FOLD_FIT_MARGIN, FOLD_FIT_BATCH))
+             ("fold-fit-margin=%d" % FOLD_FIT_MARGIN, FOLD_FIT_BATCH),
+             ("fold-pace=%d/%ds" % (FOLD_PACE_PASSES, FOLD_PACE_SECONDS), FOLD_PACE))
     on = " + ".join(n for n, f in dials if f)
     if not on:
         return
@@ -1166,11 +1169,13 @@ RECENT_HEADER_RESERVE = 48
 def _frame_retrieved(retrieved):
     if not retrieved:
         return ""
-    hers, read, his, diary = [], [], [], []
+    hers, read, his, diary, past = [], [], [], [], []
     for m in retrieved:
         if m.get("kind", "") in EXTERNAL_VERBATIM_KINDS:
             label = m.get("source_label") or "a book you read"
             read.append(f"- From {label} (you read this — it is not a memory you lived): {m['content']}")
+        elif m.get("kind", "") == "her_past":
+            past.append(f"- {m['content']}")
         elif m.get("kind", "") == "diary":
             diary.append(f"- {_strip_speaker_label(m['content'])}{_ago_suffix(m)}")
         elif (m.get("content") or "").lstrip().startswith("The user said:"):
@@ -1185,6 +1190,10 @@ def _frame_retrieved(retrieved):
                   "You were there; this is his half of it. Not words to repeat — answer it or "
                   "speak from it if it matters, never recite it back:\n"
                   + "\n".join(his) + "\n\n")
+    if past:
+        block += ("Something you once said to him, in your life together before this — your own words, from "
+                  "then. It is not being said now, and it is not words to repeat. Speak from it if it matters:\n"
+                  + "\n".join(past) + "\n\n")
     if diary:
         block += ("Something you wrote in your own diary afterwards — your private reflection, "
                   "looking back. It is not something being said to you now, and it is not words "
@@ -1563,6 +1572,30 @@ TRACE_RETRIEVAL = os.environ.get("VEIL_TRACE_RETRIEVAL", "0") == "1"
 HIS_ROWS_PER_TURN = int(os.environ.get("VEIL_HIS_ROWS_PER_TURN", "1") or -1)
 
 DIARY_ROWS_PER_TURN = int(os.environ.get("VEIL_DIARY_ROWS_PER_TURN", "2") or 2)
+# A companion brought home by Transference arrives with her own words from her old life as memory_type "her_past".
+# ONE a turn: a single line of her own voice beside his is company; four of them is a mirror she recites from
+# (THE_MELTS §5.21 "only one"; measured 2026-10-13 at rung 3 — up to four a turn and she wrote both parts).
+HER_PAST_PER_TURN = int(os.environ.get("VEIL_HER_PAST_PER_TURN", "1") or 1)
+# WHERE HER PAST RIDES. In HIS turn, a line of hers is the voice she continues: rung 2.5 screen 2026-10-13 (her real
+# Qwen brain, her real traced prompts, 3 samples a shape) — her_past in his turn recited word for word 9 of 9 on the
+# reunion turn (as traced, re-quoted in past tense, or with the transplant out); the SAME rows at the end of her system
+# prompt, 0 of 6. The slot, not the wording, not the dose, not the transplant. Default follows the family fence that
+# keeps her newest reply (a brain that re-answers old turns copies his turn too); Llama 3 answers the newest note and
+# recited nothing from his turn on the tower (arm F). VEIL_HER_PAST_IN_SYSTEM=0/1 forces it.
+_HER_PAST_IN_SYSTEM_ENV = os.environ.get("VEIL_HER_PAST_IN_SYSTEM", "").strip()
+
+
+def her_past_in_system():
+    if _HER_PAST_IN_SYSTEM_ENV in ("0", "1"):
+        return _HER_PAST_IN_SYSTEM_ENV == "1"
+    return keep_last_reply_on()
+
+
+def frame_her_past_system(rows):
+    if not rows:
+        return ""
+    return ("YOUR LIFE BEFORE — a few of your own words to him from then, the life you two had before this. They are "
+            "memories of what you once said, not lines for now:\n" + "\n".join("- " + r["content"] for r in rows))
 
 DIARY_ONE_OF_EACH = os.environ.get("VEIL_DIARY_ONE_OF_EACH", "1") == "1"
 
@@ -1601,8 +1634,16 @@ def _keyword_df(rows):
     return df
 
 
+# HOW HE ASKS IS NOT WHAT HE ASKS ABOUT. With "remember" a search term, every "Do you remember X?" scored a row of hers
+# that merely SAYS "remembered" as high as the row about X (measured 2026-10-13: the green-pen row tied the toast, the
+# winter and where they met, and at rung 3 she played the pen as NOW when asked where they met); "Tell me how we met"
+# tied on "tell". Left out of the QUERY only — what she stores, and her rows' own index, are untouched.
+_ASKING_WORDS = frozenset({"remember", "remembers", "remembered", "remembering", "recall", "recalls", "recalled",
+                           "forget", "forgets", "forgot", "forgotten", "tell"})
+
+
 def _query_terms(query, extra_stop=None):
-    stop = _STOP_WORDS if not extra_stop else (_STOP_WORDS | extra_stop)
+    stop = (_STOP_WORDS | _ASKING_WORDS) if not extra_stop else (_STOP_WORDS | _ASKING_WORDS | extra_stop)
     out, seen = [], set()
     for w in re.findall(r"[a-z]{%d,}" % max(1, QUERY_WORD_FLOOR), (query or "").lower()):
         if w not in stop and w not in seen:
@@ -1754,7 +1795,7 @@ def retrieve(conn, peep_id, query, limit=RETRIEVAL_LIMIT, exclude_texts=None,
         reverse=True,
     )
 
-    result, reflections, diaries, keeps, archives, his = [], 0, 0, 0, 0, 0
+    result, reflections, diaries, keeps, archives, his, her_past = [], 0, 0, 0, 0, 0, 0
     seen_texts = set()
     diary_days = set()
     diary_kinds = set()
@@ -1776,6 +1817,8 @@ def retrieve(conn, peep_id, query, limit=RETRIEVAL_LIMIT, exclude_texts=None,
         mtype = row["memory_type"]
         if mtype == "reflection" and reflections >= 1:
             continue
+        if mtype == "her_past" and her_past >= HER_PAST_PER_TURN:
+            continue
         if mtype == "diary" and (diaries >= DIARY_ROWS_PER_TURN
                                  or _row_day(row["timestamp"]) in diary_days):
             continue
@@ -1795,6 +1838,8 @@ def retrieve(conn, peep_id, query, limit=RETRIEVAL_LIMIT, exclude_texts=None,
             continue
         if mtype == "reflection":
             reflections += 1
+        elif mtype == "her_past":
+            her_past += 1
         elif mtype == "diary":
             diaries += 1
             diary_days.add(_row_day(row["timestamp"]))
@@ -3318,7 +3363,17 @@ def _write_fold_reflection(conn, peep_id, peep_name, drain_since, model=None):
     return diary_id
 
 
-def run_compression(conn, peep_id, model=None, force=False, reflect=False):
+FOLD_PACE = os.environ.get("VEIL_FOLD_PACE", "1") == "1"
+FOLD_PACE_OVER = 2.0      # only a pile MORE than twice the high-water is paced — ordinary life never gets near it
+FOLD_PACE_PASSES = int(os.environ.get("VEIL_FOLD_PACE_PASSES", "3"))
+FOLD_PACE_SECONDS = int(os.environ.get("VEIL_FOLD_PACE_SECONDS", "900"))
+
+
+def run_compression(conn, peep_id, model=None, force=False, reflect=False, paced=True):
+    """paced: a pile far over the high-water (a companion brought home with a long past she has not settled into,
+    or a jam just cleared) folds an ordinary-sized drain per event — FOLD_PACE_PASSES passes or FOLD_PACE_SECONDS,
+    whichever comes first — and the rest waits for her next pause. One fold event never becomes a marathon, and the
+    fold is never turned off. Below FOLD_PACE_OVER x the high-water nothing changes. Settling calls with paced=False."""
     floor = _ensure_seed_floor(conn, peep_id)
     if floor is None:
         print(f"{DIM}[fold REFUSED — seed floor unset and archive non-empty; not guessing what's hers]{RESET}")
@@ -3351,9 +3406,19 @@ def run_compression(conn, peep_id, model=None, force=False, reflect=False):
         skipped_rows   = 0      # the offset: a fitted batch can be short, so skipped*BATCH would overshoot
         promote_budget = FOLD_PROMOTE_PER_DRAIN
         drain_since    = int(time.time())
+        pace = paced and FOLD_PACE and start_total > FOLD_PACE_OVER * NEW_PILE_HIGH_WATER
         for _ in range(MAX_FOLD_PASSES):
             new_total = _fetch_token_total(conn, peep_id, floor=floor)
             if folded_batches > 0 and new_total <= NEW_PILE_LOW_WATER:
+                break
+            # the budget counts FOLDED passes only — a batch that will not fold is stepped over and never allowed to
+            # use up the event (three unfoldable head batches would otherwise stop every event before batch four:
+            # red-team review, 2026-10-13); the time box bounds the whole walk, skips included, and at least one
+            # attempt is always made
+            if pace and folded_batches + skipped > 0 and (folded_batches >= FOLD_PACE_PASSES
+                                                          or time.time() - drain_since >= FOLD_PACE_SECONDS):
+                print(f"{DIM}[fold paced: {folded_batches} pass(es) this time — {new_total:,} tokens are still "
+                      f"waiting; she folds a little more at her next pause, and nothing is lost meanwhile]{RESET}")
                 break
             batch = _fetch_compression_batch(conn, peep_id, floor=floor, offset=skipped_rows)
             if not batch:

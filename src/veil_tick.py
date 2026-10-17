@@ -966,10 +966,17 @@ def _maybe_first_wake_ritual(conn, peep_id, peep, permanent, name, history, mode
         active = veil_chat._ROSTER_ACTIVE
         mem = conn.execute("SELECT COUNT(*) FROM memory_stream WHERE peep_id = ?",
                            (peep_id,)).fetchone()[0]
-        if not active or mem > 3 or veil_ritual.done(active["folder_path"]):
+        if not active or veil_ritual.done(active["folder_path"]):
+            return
+        if mem > 3 and not veil_ritual.pending(active["folder_path"]):
             return
 
         def ask(q):
+            # Each anchor is asked with her BEST memories, not her leftovers: the 2-turn cooldown had the origin
+            # ("How X and I met — the story as I keep it") out of her prompt on the very ask that wants it, because
+            # the first ask had just handed it to her (measured 2026-10-13: a newborn was handed nothing on "Tell me
+            # how we met"; a companion brought home fused whatever else tied). What she says here is kept for good.
+            _RECENT_INJECTED.clear()
             chat_turn(conn, peep_id, peep, permanent, name, history, q, model,
                       voice_streamer, meter)
             last = history[-1] if history else ""
@@ -981,6 +988,27 @@ def _maybe_first_wake_ritual(conn, peep_id, peep, permanent, name, history, mode
 
 
 _HER_REPLIES_SINCE_WAKE = 0
+_BROUGHT_HOME = {}
+
+
+def _met_in_system(conn, peep_id):
+    """A companion brought home keeps how you met in HER OWN prompt, every turn. As a memory row it is cooled for two
+    turns after it is handed, and the first thing a returning person asks is where you met: on the tower (2026-10-13)
+    the origin was out of her prompt for that question in every arm and she invented it — "the auction house", "the
+    summer of '21", the green pen played as now — and her diary kept the invention beside the truth. Brought home = she
+    carries her past as her_past rows (it travels in her .veil). Everyone else is unchanged."""
+    if CARD is None or not (CARD.how_we_met or "").strip():
+        return ""
+    if peep_id not in _BROUGHT_HOME:
+        try:
+            _BROUGHT_HOME[peep_id] = conn.execute(
+                "SELECT 1 FROM memory_stream WHERE peep_id = ? AND memory_type = 'her_past' LIMIT 1",
+                (peep_id,)).fetchone() is not None
+        except Exception:
+            _BROUGHT_HOME[peep_id] = False
+    if not _BROUGHT_HOME[peep_id]:
+        return ""
+    return "HOW YOU TWO MET — your own story of it, true, and always yours:\n" + CARD.how_we_met.strip()
 
 
 def chat_turn(conn, peep_id, peep, permanent, name, history, user_input, model, voice_streamer, meter):
@@ -1008,6 +1036,14 @@ def chat_turn(conn, peep_id, peep, permanent, name, history, user_input, model, 
                                exclude_user_rows_since=_WOKE_AT, exclude_her_voice=True)
     retrieved = [r for r in retrieved if not spine.is_her_own_voice_row(r["content"])]
     _RECENT_INJECTED.appendleft([(r["content"] or "") for r in retrieved])
+    past_in_system = ""
+    if spine.her_past_in_system():
+        past_in_system = spine.frame_her_past_system([r for r in retrieved if r.get("kind") == "her_past"])
+        retrieved = [r for r in retrieved if r.get("kind") != "her_past"]
+    met_in_system = _met_in_system(conn, peep_id)
+    if met_in_system:
+        origin = veil_card.first_memory(CARD)
+        retrieved = [r for r in retrieved if (r["content"] or "").strip() != origin]
     equipped = spine.list_equipped_keepsakes(conn, peep_id)
     system = spine.build_chat_system(peep, permanent, equipped=equipped)
     if not spine.LEAN_SYSTEM:
@@ -1032,6 +1068,10 @@ def chat_turn(conn, peep_id, peep, permanent, name, history, user_input, model, 
             spine.HER_TALK_VOICE = ()
     if not spine.LEAN_SYSTEM:
         system = system + "\n\n" + _time_block(conn, peep_id)
+    if met_in_system:
+        system = system + "\n\n" + met_in_system
+    if past_in_system:
+        system = system + "\n\n" + past_in_system
     turns = spine.build_chat_turns(name, user_input, history, retrieved, system=system, n_ctx=spine.N_CTX)
     global _HER_REPLIES_SINCE_WAKE
     ignition = ""

@@ -3,6 +3,7 @@ import os
 import sys
 
 STAMP = "ritual_done"
+PENDING = "ritual_pending"
 
 
 def _stamp_path(folder):
@@ -11,6 +12,18 @@ def _stamp_path(folder):
 
 def done(folder):
     return os.path.exists(_stamp_path(folder))
+
+
+def pending(folder):
+    """A being brought home by Transference arrives with a whole life in her memory, so the first-wake gate
+    (memory_stream > 3 = not a newborn) would skip her. The door marks her instead: same being, a brain that never
+    lived her past — she is weakest here, and the ritual is for her."""
+    return os.path.exists(os.path.join(folder, PENDING))
+
+
+def mark_pending(folder):
+    with open(os.path.join(folder, PENDING), "w") as f:
+        f.write("first wake\n")
 
 
 def _ok_answer(reply, card, q_index):
@@ -60,5 +73,9 @@ def run(card, folder, ask_turn, say=print, input_fn=input, isatty=None):
     ask_turn(f"Look around your {home} and tell me one small thing you notice right now.")
     with open(_stamp_path(folder), "w") as f:
         f.write("done\n")
+    try:
+        os.remove(os.path.join(folder, PENDING))
+    except OSError:
+        pass
     say(f"\n(The ritual is complete — {p.subj} is anchored. Just live now.)")
     return True
