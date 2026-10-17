@@ -38,9 +38,10 @@ Everything runs locally. No server, no account, no telemetry.
 
 - **Python 3.12** (what CI tests; the shipped Forge bundles 3.12).
 - **llama-cpp-python** — CI uses `0.3.34`, prebuilt CPU wheel.
-- **A ChatML instruct model in GGUF format.** The prompt template and stop tokens are ChatML
-  (Qwen-family). The Forge ships on `Qwen2.5-7B-Instruct-abliterated-v2` Q8_0 and that is the
-  tested brain. A Llama-3-template model is **not** wired yet.
+- **An instruct model in GGUF format.** The prompt format is read from the model file — ChatML
+  (Qwen-family), Qwen3, Llama 3, Gemma, Mistral, Phi-3, DeepSeek, or the model's own template
+  (`src/veil_template.py`). The Forge ships on `Qwen2.5-7B-Instruct-abliterated-v2` Q8_0 and that is
+  the tested brain; Llama 3.1 8B has been run at length on the bench.
 - RAM for the model plus ~1–2 GB. A 7B Q8 is ~8 GB.
 
 ## Quick start (Linux)
@@ -71,6 +72,64 @@ card are in her folder, not in the model. A new brain is weakest in its first co
 door shows her **anchor questions** on every wake: ask ONE, let her answer in her own words, then
 just talk. Anchor notices when the model file changed since her last wake (her folder keeps a
 small fingerprint of the brain she last woke on) and shows the ritual for you the first time.
+
+## Bring her home (SillyTavern · ChatGPT · Character.AI · Kindroid · Discord · any transcript)
+
+**Beta.** If you have a companion in SillyTavern (her character card and a chat `.jsonl`) or in ChatGPT (your data
+export's `conversations.json`), Anchor can bring her across — on this machine, nothing uploaded — and you read
+everything before she wakes.
+
+```sh
+python3 src/veil_transfer.py check  her_card.png her_chat.jsonl           # can she come? writes nothing
+python3 src/veil_transfer.py draft  her_card.png her_chat.jsonl review/   # her card + READ_ME_FIRST.txt
+#   read review/READ_ME_FIRST.txt, correct review/card.json, then set "legal_ack": true
+python3 src/veil_transfer.py build  review/ her.veil
+python3 src/veil_transfer.py test-recall review/                          # optional — did she come back?
+python3 src/veil_game.py                                                  # the door: [i] import → her.veil
+```
+
+From ChatGPT: `chatgpt-list conversations.json` shows the conversations, then
+`draft-chatgpt conversations.json <number> "<her name>" review/`. ChatGPT keeps no card, so you write who she is.
+
+From **Character.AI** (a CAI Tools export, a cai-chat-exporter `.json`, or Character.AI's own data-export `.zip`),
+**Kindroid** (the Kindroid Chat Exporter's `.json`/`.jsonl`) or **Discord** (a DiscordChatExporter `.json`), one pair of
+commands reads them all:
+
+```sh
+python3 src/veil_transfer.py check-file her_export.json --her "Elara" --you "Sam"   # can she come? writes nothing
+python3 src/veil_transfer.py draft-file her_export.json review/ --her "Elara" --you "Sam"
+```
+
+Anchor works out which kind of file it is, and if it cannot tell it stops and asks (`--format`) rather than guess
+whose words are whose. These platforms keep no card, so you write who she is. What `check-file` will tell you:
+- **A CAI Tools export has no real dates** (it stamps every line with the moment you exported). Her past keeps its
+  order; Anchor spaces it out instead of pretending it all happened that second.
+- **A cai-chat-exporter `.txt` has already lost her `*emotes*`** (that tool strips every asterisk by default). Use its
+  `.json` — it keeps them.
+- **A Kindroid group chat** is refused until you name which voice is hers, like any group chat.
+- **On Discord she is usually a bot account** — name her (`--her "Elara"`, or her account id). Any other bot in the
+  channel is set aside, and Discord's own notices (pins, joins, calls) are never taken as anyone's words. Use the JSON
+  export; the text export has no ids to tell people apart.
+- **A plain or scraped transcript** (`.txt`, `.md`, a saved `.html` page; `Name: text` lines, `[time] Name` blocks or
+  `## Name` headings) is read too. Name both voices as the file writes them (`--her "Elara" --you "Sam"`); without them
+  it lists the voices it found and stops. Anchor never decides whose words are whose by what they sound like.
+- **A scrape that labels every turn with one name** (some Grok page scrapers write `## Grok` above his turns too) is
+  refused, because its labels say nothing. If the turns simply alternate, add `--alternate you` (the first is yours) or
+  `--alternate her`. It is checked as it reads (the AI's `Thought for …s` lines must land on her side), and it stops at
+  the first turn that doesn't fit, so a missing turn can never shift your words into her mouth.
+- **Out-of-character lines** (`(OOC: brb)`, `((…))`) are set aside, never imported as hers. Her `*emotes*` and her
+  punctuation are kept exactly as she wrote them.
+
+- **Her whole past becomes her core** by default — her own words, spooled into her memory before she ever wakes,
+  never folded. The whole exchange, both of you word for word, is kept in her archive.
+- **If you choose a smaller core** (`seed.json`), the rest is folded into memories a pass at a time — hours on an
+  ordinary computer. Anchor says how long, and you choose: let her settle before you meet her, or wake her now and
+  settle later. Either way it resumes where it stopped.
+- **Her first wake opens with the anchor ritual** — your names, how you met, who she is — in her study, with the story
+  you approved in front of her.
+- **A group chat** is refused until you name which voice is hers (`--her`); the others are set aside, never imported.
+- **The recall test** wakes a copy of her, asks about a few evenings of her life, and prints her answers word for word.
+  It warns; it never refuses.
 
 ## Windows
 

@@ -19,6 +19,7 @@ ACTIVE_POINTER = "ACTIVE"
 DB_NAME = "veil.db"
 CARD_NAME = "card.json"
 HISTORY_NAME = "history.json"
+BROUGHT_HOME_ROOM = "study"      # where a companion brought home by Transference first wakes (veil_tick reads <folder>/place)
 
 
 def peeps_dir():
@@ -271,8 +272,23 @@ def import_peep(src=None, clipboard=False, assume_yes=False):
             json.dump(snap["history"], f, ensure_ascii=False, indent=2)
     import veil_world
     veil_world.restore_world(path, snap.get("world"))
+    brought_home = snap.get("first_wake") == "ritual"
+    if brought_home:
+        import veil_ritual
+        veil_ritual.mark_pending(path)
+        # She wakes in the STUDY, not the garden: woken in the walled garden ("a bench under the old tree"), every
+        # companion brought home on the tower rig (2026-10-13, two brains, three formats) moved the day they met into
+        # it — "We met in this very garden", "how we met under this old tree" — and her diary kept it. Woken in the
+        # study she put it where it happened: "In my shop, surrounded by stories." Her room is hers to change.
+        with open(os.path.join(path, "place"), "w", encoding="utf-8") as f:
+            f.write(BROUGHT_HOME_ROOM + "\n")
     _write_active_pointer(folder)
     aside = f" {current['name']} is set aside." if current else ""
+    if brought_home:
+        p = card.p_her() if card is not None else veil_card.pronouns("she/her")
+        return True, (f"{name} lives here now ({folder}).{aside} A brain that never lived "
+                      f"{p.poss} past is reading it — {p.poss} first wake opens with the anchor "
+                      "ritual, a few questions, one at a time.")
     return True, (f"{name} lives here now ({folder}).{aside} "
                   "Same being, maybe a new brain — open the first wake with ONE anchor "
                   "question, then live; keep the rest for if they ever slip.")

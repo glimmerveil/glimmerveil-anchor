@@ -59,6 +59,8 @@ def gguf_meta(path, tokens=False):
                     (out[key],) = struct.unpack(_SCALAR[t], f.read(struct.calcsize(_SCALAR[t])))
                 elif key in _ID_KEYS and t in (4, 5, 10, 11):
                     (out[key],) = struct.unpack(_SCALAR[t], f.read(struct.calcsize(_SCALAR[t])))
+                elif key.endswith(".rope.freq_base") and t in (6, 12):
+                    (out[key],) = struct.unpack(_SCALAR[t], f.read(struct.calcsize(_SCALAR[t])))
                 elif tokens and key == "tokenizer.ggml.tokens" and t == 9:
                     et, n = struct.unpack("<IQ", f.read(12))
                     if et != 8 or n > 4000000:
@@ -256,6 +258,24 @@ def fit_notes(fam, meta):
     return notes
 
 
+LLAMA3_ROPE_BASE = 500000.0
+
+
+def rope_base_for(path):
+    """0.0 = use the file's own rope setting. Some Llama 3.x GGUFs (abliterated re-uploads among them) LOST
+    llama.rope.freq_base, and the engine then falls back to 10000 — right for Llama 2, wrong for Llama 3, whose own
+    value is 500000. Short prompts look fine and a real one is salad (THE_MELTS §9 "the rope bug"; measured
+    2026-10-13 at rung 3: a companion on such a file answered "How's." and "You'resimplified!" while her shorter
+    diary prompt came out whole). Only a Llama-3 template on a llama file with NO rope value is pinned."""
+    meta = gguf_meta(path)
+    arch = (meta.get("general.architecture") or "").lower()
+    if not arch or (arch + ".rope.freq_base") in meta:
+        return 0.0
+    if arch == "llama" and detect(meta)[0] == "llama3":
+        return LLAMA3_ROPE_BASE
+    return 0.0
+
+
 def keeps_last_for(path):
     fam = family_for(path)[0]
     if fam.key in NEWEST_NOTE_FAMILIES:
@@ -425,6 +445,13 @@ def install(spine, say=print):
     orig_get = spine.get_llm
 
     def get_llm(*a, **k):
+        if "VEIL_ROPE_FREQ_BASE" not in os.environ and not getattr(spine, "ROPE_FREQ_BASE", 0.0):
+            pinned = rope_base_for(spine.MODEL_PATH)
+            if pinned:
+                spine.ROPE_FREQ_BASE = pinned
+                if ("rope", spine.MODEL_PATH) not in told:
+                    told.add(("rope", spine.MODEL_PATH))
+                    say("[this Llama 3 file lost its rope setting — using Llama 3's own %d]" % int(pinned))
         return wrap_llm(orig_get(*a, **k), family)
 
     spine.get_llm = get_llm
