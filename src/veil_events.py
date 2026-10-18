@@ -127,6 +127,64 @@ def _envelope(path):
     return n / float(rate), [round(min(1.0, x), 2) for x in env]
 
 
+# THE MODULE PLUG (free, and inert until a module is installed). A paid module — its own private package — may read each
+# of her replies where Anchor makes it and write event lines. VEIL_MODULES names the modules (comma-separated importable
+# names; VEIL_MODULES_PATH says where to find them). Without it nothing is imported and nothing runs: off is exactly the
+# Anchor that shipped. A module is handed the reply, a snapshot of state and this file's emit — nothing of her prompt, her
+# memory or her history — and whatever it raises is noted once and her turn goes on. (A module is code its owner chose to
+# install: the plug is an interface, not a sandbox.)
+_MODULES = None
+
+
+def modules():
+    """The installed modules (each with an after_reply(text, state, emit)), loaded once. [] when none are named."""
+    global _MODULES
+    names = [n.strip() for n in os.environ.get("VEIL_MODULES", "").split(",") if n.strip()]
+    if not names:
+        return []
+    if _MODULES is None:
+        import importlib
+        for p in reversed([p for p in os.environ.get("VEIL_MODULES_PATH", "").split(os.pathsep) if p]):
+            if p not in sys.path:
+                sys.path.insert(0, p)
+        loaded = []
+        for n in names:
+            try:
+                m = importlib.import_module(n)
+            except Exception as e:                          # noqa: BLE001
+                _note_once("mod:" + n, f"module {n} could not load ({type(e).__name__}: {e}); she goes on without it")
+                continue
+            if callable(getattr(m, "after_reply", None)):
+                loaded.append(m)
+            else:
+                _note_once("mod:" + n, f"module {n} has no after_reply(text, state, emit); it is not used")
+        _MODULES = loaded
+    return _MODULES
+
+
+def after_reply(text, state_fn=None):
+    """Hand one of her replies to every installed module. state_fn() is asked for only when one is installed.
+    Returns how many modules read it. Never raises."""
+    try:
+        mods = modules()
+        if not mods:
+            return 0
+        try:
+            state = state_fn() if state_fn else {}
+        except Exception:                                   # noqa: BLE001
+            state = {}
+        read = 0
+        for m in mods:
+            try:
+                m.after_reply(text, dict(state), emit)
+                read += 1
+            except Exception as e:                          # noqa: BLE001 — a module never touches her turn
+                _note_once("run:" + m.__name__, f"module {m.__name__} failed ({type(e).__name__}: {e}); she goes on")
+        return read
+    except Exception:                                       # noqa: BLE001
+        return 0
+
+
 def voice(wav_path, being=None):
     """One event per sentence of HER voice, just before it plays: {start, dur, hz, env}. Off = returns at once, the wav
     is never opened. A long sentence lowers hz until the line fits; it is never cut short."""

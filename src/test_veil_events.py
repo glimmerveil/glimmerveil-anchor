@@ -195,6 +195,56 @@ reader.close()
 check("with a reader holding the file, every write lands", all(ok_writes))
 check("the reader sees whole lines only", len(tail) == 3 and all(json.loads(x)["kind"] == "act" for x in tail))
 
+# 9 · THE MODULE PLUG — free and inert: off is off; an installed module reads her reply and writes lines; a broken module
+#     never touches her turn; her prompt is the same with a module installed
+print("\n9 · the module plug")
+os.environ.pop("VEIL_MODULES", None)
+os.environ.pop("VEIL_MODULES_PATH", None)
+E._MODULES = None
+asked = []
+check("off is off: no module named, nothing imported, nothing asked of her state",
+      E.modules() == [] and E.after_reply("*smiles*", lambda: asked.append(1) or {}) == 0 and not asked)
+MODDIR = os.path.join(TMP, "mods")
+os.makedirs(MODDIR)
+with open(os.path.join(MODDIR, "rig_face_mod.py"), "w") as f:
+    f.write("SEEN = []\n"
+            "def after_reply(text, state, emit):\n"
+            "    SEEN.append((text, state))\n"
+            "    emit('emotion', {'value': 'happy', 'source': 'emote'}, being='wren-test')\n")
+with open(os.path.join(MODDIR, "rig_broken_mod.py"), "w") as f:
+    f.write("def after_reply(text, state, emit):\n    raise RuntimeError('a module that breaks')\n")
+with open(os.path.join(MODDIR, "rig_no_hook_mod.py"), "w") as f:
+    f.write("X = 1\n")
+mlog = os.path.join(TMP, "modules.log")
+os.environ.update({"VEIL_EVENTS_LOG": mlog, "VEIL_MODULES": "rig_face_mod,rig_broken_mod,rig_no_hook_mod",
+                   "VEIL_MODULES_PATH": MODDIR})
+E._MODULES = None
+buf = io.StringIO()
+with redirect_stderr(buf):
+    n = E.after_reply("*smiles*", lambda: {"worn": ["sundress"], "place": "garden", "where": "chat"})
+    n2 = E.after_reply("*smiles again*", lambda: {})
+import rig_face_mod  # noqa: E402
+check("an installed module reads her reply with the state, and writes through the line",
+      rig_face_mod.SEEN and rig_face_mod.SEEN[0] == ("*smiles*", {"worn": ["sundress"], "place": "garden", "where": "chat"})
+      and [l["kind"] for l in lines(mlog)] == ["emotion", "emotion"])
+check("a module that breaks never touches her turn (noted once; the others still read)", n == 1 and n2 == 1
+      and buf.getvalue().count("rig_broken_mod failed") == 1)
+check("a module without after_reply is not used, and says so", "rig_no_hook_mod has no after_reply" in buf.getvalue()
+      and [m.__name__ for m in E.modules()] == ["rig_face_mod", "rig_broken_mod"])
+withmod = prompt_sha({"VEIL_EVENTS_LOG": plog, "VEIL_MODULES": "rig_face_mod", "VEIL_MODULES_PATH": MODDIR})
+check("her prompt is BYTE-IDENTICAL with a module installed", withmod == off)
+real_modules = E.modules
+os.environ.pop("VEIL_MODULES", None)
+E.modules = lambda: [rig_face_mod]
+check("red-proof: a plug that runs modules nobody named IS caught",
+      E.after_reply("*smiles*", lambda: asked.append(1) or {}) != 0)
+E.modules = real_modules
+E._MODULES = None
+TICK = open(os.path.join(SRC, "veil_tick.py"), encoding="utf-8").read()
+check("the turn and her own time both hand her reply to the plug", TICK.count('_modules_read(response, "chat")') == 1
+      and TICK.count('_modules_read(output, "own time")') == 1)
+check("…and nothing there can reach her turn", "except Exception" in TICK[TICK.index("def _modules_read"):TICK.index("def _run_lane")])
+
 shutil.rmtree(TMP, ignore_errors=True)
 if fails:
     print("\n  %d check(s) failed" % len(fails))

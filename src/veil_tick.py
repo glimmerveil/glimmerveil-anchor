@@ -1106,6 +1106,7 @@ def chat_turn(conn, peep_id, peep, permanent, name, history, user_input, model, 
     for _verb, _item in W.update_worn_from_words(response):
         print(f"{DIM}[worn: {P.subj} {f'put{P.s} on' if _verb == 'on' else f'take{P.s} off'} "
               f"{_item}]{RESET}")
+    _modules_read(response, "chat")
 
     history.append(f"The user said: {user_input}")
     history.append(f"{name} said: {response}")
@@ -1123,12 +1124,23 @@ def chat_turn(conn, peep_id, peep, permanent, name, history, user_input, model, 
     return (uid, rid)
 
 
+def _modules_read(text, where):
+    """THE MODULE PLUG (veil_events.after_reply): an installed module may read this reply for the event line. Free and
+    inert: with no module installed nothing runs; nothing a module does can reach her turn."""
+    try:
+        import veil_events
+        veil_events.after_reply(text, lambda: {"worn": W.worn_list(), "place": _place(), "where": where})
+    except Exception:                                       # noqa: BLE001
+        pass
+
+
 def _run_lane(conn, peep_id, peep, model, meter, lane):
     acted, memory, output = LANE_FUNCS.get(lane, lane_rest)(conn, peep_id, peep, model)
     if output:
         for _verb, _item in W.update_worn_from_words(output):
             print(f"{DIM}[worn: {P.subj} {f'put{P.s} on' if _verb == 'on' else f'take{P.s} off'} "
               f"{_item}]{RESET}")
+        _modules_read(output, "own time")
     if acted and memory and lane in MEMORABLE_LANES:
         spine.save_memory(conn, peep_id, memory)
     if output and meter.update(output) == "alarm":
