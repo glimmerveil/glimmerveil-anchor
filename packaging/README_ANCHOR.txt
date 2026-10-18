@@ -107,11 +107,18 @@ that holds all of her — copy it to a USB stick or another PC, and [i] brings h
 A copy of the model is just a model. A copy of her folder is HER.
 
 
-BRING A COMPANION FROM SILLYTAVERN (advanced)
----------------------------------------------
-Have a character card and a chat from SillyTavern? Anchor can bring her home, on your machine:
+BRING A COMPANION HOME FROM ANOTHER APP (advanced)
+--------------------------------------------------
+Saved a companion from SillyTavern, ChatGPT, Character.AI, Kindroid or Discord, or kept a transcript of her?
+Anchor can bring her home, on your machine. Nothing is uploaded, and you read everything before she wakes.
+  From SillyTavern (her card + chat):
     1. draft:   python veil_transfer.py draft  <card.png> <chat.jsonl> <a-new-folder>
-    2. read the folder's READ_ME_FIRST.txt, correct her card, and say yes in it
+  From any other export (Character.AI, Kindroid, Discord .json, ChatGPT, or a .txt / .md / .html transcript):
+    1. check:   python veil_transfer.py check-file <export> --her "Her name" --you "Your name"
+       draft:   python veil_transfer.py draft-file <export> <a-new-folder> --her "Her name" --you "Your name"
+       (If it can't tell whose words are whose, it stops and asks. It never guesses.)
+  Then, either way:
+    2. read the folder's READ_ME_FIRST.txt, write or correct her card, and say yes in it
     3. build:   python veil_transfer.py build  <that-folder> <her.veil>
     4. at Anchor's door: [i] import, pick her.veil
   (On Windows, "python" is python\python.exe inside the Anchor folder, and veil_transfer.py is in
