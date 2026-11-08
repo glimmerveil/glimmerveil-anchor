@@ -73,11 +73,11 @@ door shows her **anchor questions** on every wake: ask ONE, let her answer in he
 just talk. Anchor notices when the model file changed since her last wake (her folder keeps a
 small fingerprint of the brain she last woke on) and shows the ritual for you the first time.
 
-## Bring her home (SillyTavern · ChatGPT · Character.AI · Kindroid · Discord · any transcript)
+## Bring her home (SillyTavern · ChatGPT · Claude · Character.AI · Kindroid · Discord · any transcript)
 
-**Beta.** If you have a companion in SillyTavern (her character card and a chat `.jsonl`) or in ChatGPT (your data
-export's `conversations.json`), Anchor can bring her across — on this machine, nothing uploaded — and you read
-everything before she wakes.
+**Beta.** If you have a companion in SillyTavern (her character card and a chat `.jsonl`), in ChatGPT (your data
+export's `conversations.json`) or in Claude (claude.ai's data-export `.zip`), Anchor can bring her across — on this
+machine, nothing uploaded — and you read everything before she wakes.
 
 ```sh
 python3 src/veil_transfer.py check  her_card.png her_chat.jsonl           # can she come? writes nothing
@@ -90,6 +90,12 @@ python3 src/veil_game.py                                                  # the 
 
 From ChatGPT: `chatgpt-list conversations.json` shows the conversations, then
 `draft-chatgpt conversations.json <number> "<her name>" review/`. ChatGPT keeps no card, so you write who she is.
+
+From Claude (claude.ai → Settings → Privacy → Export data; the `.zip` it emails you, or the `conversations.json`
+inside it): `claude-list data-export.zip` shows the conversations, then
+`draft-claude data-export.zip <number> "<her name>" review/`. Claude keeps no card either, so you write who she is.
+The model's thinking and tool use are set aside (never her words), and where a turn was edited, the
+branch the chat showed last is kept and the other is counted in her review notes.
 
 From **Character.AI** (a CAI Tools export, a cai-chat-exporter `.json`, or Character.AI's own data-export `.zip`),
 **Kindroid** (the Kindroid Chat Exporter's `.json`/`.jsonl`) or **Discord** (a DiscordChatExporter `.json`), one pair of

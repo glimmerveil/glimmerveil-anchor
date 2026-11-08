@@ -109,11 +109,15 @@ A copy of the model is just a model. A copy of her folder is HER.
 
 BRING A COMPANION HOME FROM ANOTHER APP (advanced)
 --------------------------------------------------
-Saved a companion from SillyTavern, ChatGPT, Character.AI, Kindroid or Discord, or kept a transcript of her?
+Saved a companion from SillyTavern, ChatGPT, Claude, Character.AI, Kindroid or Discord, or kept a transcript of her?
 Anchor can bring her home, on your machine. Nothing is uploaded, and you read everything before she wakes.
   From SillyTavern (her card + chat):
     1. draft:   python veil_transfer.py draft  <card.png> <chat.jsonl> <a-new-folder>
-  From any other export (Character.AI, Kindroid, Discord .json, ChatGPT, or a .txt / .md / .html transcript):
+  From ChatGPT (conversations.json) or Claude (the export .zip, or its conversations.json):
+    1. list:    python veil_transfer.py chatgpt-list <conversations.json>      (or: claude-list <export.zip>)
+       draft:   python veil_transfer.py draft-chatgpt <conversations.json> <number> "Her name" <a-new-folder>
+                (or: draft-claude <export.zip> <number> "Her name" <a-new-folder>)
+  From any other export (Character.AI, Kindroid, Discord .json, or a .txt / .md / .html transcript):
     1. check:   python veil_transfer.py check-file <export> --her "Her name" --you "Your name"
        draft:   python veil_transfer.py draft-file <export> <a-new-folder> --her "Her name" --you "Your name"
        (If it can't tell whose words are whose, it stops and asks. It never guesses.)

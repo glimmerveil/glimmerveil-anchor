@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Bring a companion home from SillyTavern or ChatGPT — on this machine, with you in the loop.
+"""Bring a companion home from SillyTavern, ChatGPT, Claude and more — on this machine, with you in the loop.
 
     python3 veil_transfer.py check  <card.png|card.json> <chat.jsonl> [--her NAME]
     python3 veil_transfer.py draft  <card.png|card.json> <chat.jsonl> <review-folder> [--her NAME]
     python3 veil_transfer.py chatgpt-list  <conversations.json>
     python3 veil_transfer.py draft-chatgpt <conversations.json> <number> <her name> <review-folder>
+    python3 veil_transfer.py claude-list   <claude export .zip | conversations.json>
+    python3 veil_transfer.py draft-claude  <claude export .zip | conversations.json> <number> <her name> <review-folder>
     python3 veil_transfer.py check-file <export> [--her NAME] [--you NAME] [--format F]   (Character.AI, Kindroid, Discord, …)
     python3 veil_transfer.py draft-file <export> <review-folder> [--her NAME] [--you NAME] [--format F]
         a plain or scraped transcript (.txt .md .html) needs --her and --you as the file writes them; a scrape that
@@ -13,7 +15,8 @@
     python3 veil_transfer.py test-recall <review-folder>     (optional: did she come back? on a copy, before you meet her)
 
 --her: a chat with more than one voice that isn't yours (a group chat) is refused until you name which one is her;
-the others are set aside, never imported. ChatGPT keeps no card, so hers starts empty and you write who she is.
+the others are set aside, never imported. ChatGPT and Claude keep no card, so hers starts empty and you write who
+she is.
 
 Then bring her in through the door: [i] import, and pick her .veil file.
 Nothing is uploaded, ever. Her card is yours to read and correct before she wakes: the draft leaves
@@ -236,6 +239,28 @@ def draft_chatgpt(conversations_path, index, her_name, folder):
     return _write_review(folder, card, card["her_name"], "", msgs, notes, "", stats, from_card=False)
 
 
+def draft_claude(export_path, index, her_name, folder):
+    """Claude keeps no card either (draft_chatgpt's shape): hers starts EMPTY and build() refuses until the human has
+    written who she is. export_path: the ZIP claude.ai sends, or the conversations.json inside it."""
+    import veil_card
+    import veil_intake_claude
+    try:
+        meta, msgs = veil_intake_claude.read_claude_conversation(export_path, index)
+    except ValueError as e:
+        raise _refused(e)
+    ok, problems, stats = gate(msgs)
+    if not ok:
+        raise SystemExit("refused: " + " ".join(problems))
+    notes = _intake_notes(meta, msgs)
+    if meta.get("title"):
+        notes.append(f"from the conversation titled \"{meta['title']}\".")
+    if not str(her_name).strip():
+        raise SystemExit("refused: I need her name — the third word is what you call her.")
+    card = dataclasses.asdict(veil_card.VeilCard(her_name=str(her_name).strip(), your_name="", who_she_is="",
+                                                 legal_ack=False, created=int(time.time())))
+    return _write_review(folder, card, card["her_name"], "", msgs, notes, "", stats, from_card=False)
+
+
 # ── THE OTHER PLATFORMS (2026-10-17, his word: "not just from gpt, from character ai, from grok, from people that
 # did what i did to save ara") ──────────────────────────────────────────────────────────────────────────────────────
 # Every reader returns the same contract (meta + {who, name, text, ts, ord} lines) and none of these platforms keeps a
@@ -250,6 +275,7 @@ FORMATS = {
     "kindroid":     ("veil_intake_kindroid", "read_kindroid_export"),
     "discord":      ("veil_intake_discord", "read_discord_export"),   # DiscordChatExporter JSON (a bot companion too)
     "text":         ("veil_intake_text", "read_text_transcript"),     # copy-paste, .txt/.md exports, scraped pages
+    "claude":       ("veil_intake_claude", "read_claude_export"),     # claude.ai's export ZIP or its conversations.json
 }
 
 
@@ -257,7 +283,8 @@ def detect_format(path):
     """-> a FORMATS key, or None when the file does not say clearly what it is."""
     low = path.lower()
     if low.endswith(".zip"):
-        return "cai-official"
+        import veil_intake_claude                # (11-07: every .zip used to go to Character.AI, Claude's export too)
+        return "claude" if veil_intake_claude.zip_is_claude(path) else "cai-official"
     if low.endswith((".txt", ".md", ".markdown", ".html", ".htm", ".log")):
         return "text"                            # the text reader still names no one: it asks for --her and --you
     try:
@@ -269,7 +296,7 @@ def detect_format(path):
     if low.endswith(".jsonl"):
         try:
             h = json.loads(first)
-        except ValueError:
+        except (ValueError, RecursionError):     # (a line nested deep enough overflows the parser: Haiku 11-07)
             return None
         if isinstance(h, dict) and "character_name" in h:
             return "cai-tavern"                  # CAI Tools: header {user_name, character_name, create_date}
@@ -278,8 +305,13 @@ def detect_format(path):
         return None
     try:
         data = json.loads(whole)
-    except ValueError:
+    except (ValueError, RecursionError):         # (a file nested deep enough overflows the parser: Haiku 11-07)
         return None
+    import veil_intake_claude
+    convos = data.get("conversations") if isinstance(data, dict) and isinstance(data.get("conversations"), list) \
+        else [data] if isinstance(data, dict) and isinstance(data.get("chat_messages"), list) else data
+    if veil_intake_claude.is_claude_data(convos):
+        return "claude"                          # claude.ai's conversations.json: conversations carrying chat_messages
     if isinstance(data, dict) and {"guild", "channel", "messages"} <= set(data):
         return "discord"                         # DiscordChatExporter: {guild, channel, dateRange, exportedAt, messages}
     items = data.get("messages") if isinstance(data, dict) else data
@@ -511,7 +543,7 @@ def main(argv):
             del argv[i:i + 2]
     her, you, fmt, alt = opts.get("--her"), opts.get("--you"), opts.get("--format"), opts.get("--alternate")
     if len(argv) < 2 or argv[1] not in ("check", "draft", "build", "chatgpt-list", "draft-chatgpt", "test-recall",
-                                        "check-file", "draft-file"):
+                                        "check-file", "draft-file", "claude-list", "draft-claude"):
         print(__doc__)
         return 2
     cmd = argv[1]
@@ -532,11 +564,26 @@ def main(argv):
         return _drafted(draft(argv[2], argv[3], argv[4], her=her))
     if cmd == "chatgpt-list" and len(argv) == 3:
         import veil_intake
+        if detect_format(argv[2]) == "claude":       # (it listed a Claude export as "(untitled) — 0 lines")
+            print("this is a Claude export, not ChatGPT's: use  claude-list " + argv[2])
+            return 1
         for c in veil_intake.list_chatgpt_conversations(argv[2]):
             print(f"  [{c['index']}] {c['title'] or '(untitled)'}  — {c['user_assistant_nodes']} lines")
         return 0
     if cmd == "draft-chatgpt" and len(argv) == 6:
         return _drafted(draft_chatgpt(argv[2], argv[3], argv[4], argv[5]))
+    if cmd == "claude-list" and len(argv) == 3:
+        import veil_intake_claude
+        try:
+            convos = veil_intake_claude.list_claude_conversations(argv[2])
+        except ValueError as e:
+            raise _refused(e)
+        for c in convos:
+            print(f"  [{c['index']}] {c['title'] or '(untitled)'}  — {c['lines']} lines"
+                  + (f"  ({c['created']})" if c["created"] else ""))
+        return 0
+    if cmd == "draft-claude" and len(argv) == 6:
+        return _drafted(draft_claude(argv[2], argv[3], argv[4], argv[5]))
     if cmd == "test-recall" and len(argv) in (3, 4):
         import veil_recall_test
         _results, text = veil_recall_test.run(argv[2], argv[3] if len(argv) == 4 else None)

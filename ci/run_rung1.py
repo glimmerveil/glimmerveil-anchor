@@ -43,6 +43,7 @@ TESTS = [
     "test_veil_intake_discord.py",
     "test_veil_intake_clean.py",
     "test_veil_intake_text.py",
+    "test_veil_intake_claude.py",
     "test_veil_transfer_files.py",
     "test_veil_transfer_e2e_readers.py",
     "test_veil_recall_test.py",
