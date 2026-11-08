@@ -277,7 +277,7 @@ def _read_one(convo):
         if who is None:
             skipped_roles += 1
             continue
-        if m.get("attachments") or m.get("files"):
+        if m.get("attachments") or m.get("files") or m.get("files_v2"):
             attached += 1
         text = _text_of(m, counts)
         if not text:
