@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Transference intake — Claude (claude.ai "Export data"), 2026-11-07.
 
-His word, from the room: "Claude was missed … go fix it and get it ready to ship." Until today a Claude export
-was misread as a Character.AI ZIP (every .zip went there) and its conversations.json was refused outright.
+Claude had been missed: until 2.0.2 a Claude export was misread as a Character.AI ZIP (every .zip went there) and
+its conversations.json was refused outright.
 
 THE SHAPE (no official schema is published; read from independent parsers, see PROOF_CLAUDE.md):
   claude.ai -> Settings -> Privacy -> Export data -> a ZIP holding conversations.json (+ users.json, projects.json).
