@@ -108,10 +108,10 @@ def main():
     shutil.copy2(os.path.join(REPO, "LICENSE"), ROOT)
     # third-party notices, read off what THIS build installed (Opus 11-08: the voice builds carried GPL/LGPL code without its
     # licence text or a source pointer): third-party/THIRD_PARTY_NOTICES.md + every licence file, and the GPL/LGPL texts
-    extras = ["Python %s (the embedded runtime, python/)=PSF-2.0, https://www.python.org/" % PY_VERSION]
+    extras = ["Python %s (the embedded runtime, python/)=PSF-2.0, https://www.python.org/; licenses/Python-PSF-LICENSE.txt" % PY_VERSION]
     if VOICE:
-        extras += ["Kokoro-82M v1.0 (the voice model, voice/kokoro-v1.0.onnx, voices-v1.0.bin)=Apache-2.0, https://huggingface.co/hexgrad/Kokoro-82M",
-                   "Whisper base.en for whisper.cpp (the ear's model, voice/ggml-base.en.bin)=MIT, OpenAI; https://huggingface.co/ggerganov/whisper.cpp"]
+        extras += ["Kokoro-82M v1.0 (the voice model, voice/kokoro-v1.0.onnx, voices-v1.0.bin)=Apache-2.0, https://huggingface.co/hexgrad/Kokoro-82M; licenses/Apache-2.0.txt",
+                   "Whisper base.en for whisper.cpp (the ear's model, voice/ggml-base.en.bin)=MIT, OpenAI; https://huggingface.co/ggerganov/whisper.cpp; licenses/OpenAI-Whisper-LICENSE.txt"]
     subprocess.check_call([sys.executable, os.path.join(REPO, "ci", "third_party_notices.py"), "--out", os.path.join(ROOT, "third-party"),
                            "--tag", os.environ.get("GITHUB_REF_NAME", "") if os.environ.get("GITHUB_REF_TYPE") == "tag" else "",
                            "--common", os.path.join(REPO, "packaging", "licenses")]

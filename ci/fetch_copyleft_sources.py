@@ -25,13 +25,17 @@ if not items:
 
 def get(url, dest):
     req = urllib.request.Request(url, headers={"User-Agent": "glimmerveil-anchor-ci"})
-    with urllib.request.urlopen(req, timeout=600) as r, open(dest + ".part", "wb") as f:
-        while True:
-            b = r.read(1 << 20)
-            if not b:
-                break
-            f.write(b)
-    os.replace(dest + ".part", dest)
+    try:
+        with urllib.request.urlopen(req, timeout=600) as r, open(dest + ".part", "wb") as f:
+            while True:
+                b = r.read(1 << 20)
+                if not b:
+                    break
+                f.write(b)
+        os.replace(dest + ".part", dest)
+    finally:
+        if os.path.exists(dest + ".part"):
+            os.remove(dest + ".part")                                  # (a failed download leaves nothing behind: Haiku 11-08)
     return dest
 
 

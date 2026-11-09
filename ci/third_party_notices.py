@@ -15,23 +15,46 @@ import re
 import shutil
 import sys
 
-# what some packages carry INSIDE them (native code built from another project), and its licence + exact source
-EMBEDDED = {
-    "espeakng-loader": [("eSpeak NG 1.52.0 (libespeak-ng and espeak-ng-data)", "GPL-3.0-or-later",
-                         "https://github.com/espeak-ng/espeak-ng/archive/refs/tags/1.52.0.tar.gz (the tag the loader's CI clones; "
-                         "built by https://github.com/thewh1teagle/espeakng-loader at 146599e29be31bf17d99f0bcb7dbb2f92aef3d95 for 0.2.4: "
-                         "build.sh and .github/workflows/build.yml there; cmake -DBUILD_SHARED_LIBS=ON -DCOMPILE_INTONATIONS=OFF, no source changes)")],
-    "soundfile": [("libsndfile (the shared library in _soundfile_data/; soundfile 0.14.0 bundles libsndfile 1.2.2)", "LGPL-2.1-or-later",
-                   "https://github.com/libsndfile/libsndfile/releases/download/1.2.2/libsndfile-1.2.2.tar.xz (built by "
-                   "https://github.com/bastibe/libsndfile-binaries); it is a separate shared library you may replace with your own build")],
-    "sounddevice": [("PortAudio (Windows: the DLL in _sounddevice_data/)", "MIT", "https://github.com/PortAudio/portaudio")],
-    "pywhispercpp": [("whisper.cpp (compiled in)", "MIT", "https://github.com/ggml-org/whisper.cpp")],
-    "llama-cpp-python": [("llama.cpp / ggml (compiled in)", "MIT", "https://github.com/ggml-org/llama.cpp")],
-}
+# what some packages carry INSIDE them (native code built from another project), and its licence + exact source. Versioned:
+# a package version not mapped here, or a bundled library whose version cannot be read, STOPS the build (Haiku 11-08: notices
+# naming the wrong library version are worse than none; the Windows build does not pin its voice packages)
+ESPEAK_IN_LOADER = {"0.2.4": ("1.52.0", "146599e29be31bf17d99f0bcb7dbb2f92aef3d95")}   # loader version -> (eSpeak NG tag, loader commit)
+
+
+def embedded(key, d):
+    if key == "espeakng-loader":
+        if d.version not in ESPEAK_IN_LOADER:
+            raise SystemExit("FAIL espeakng-loader %s: which eSpeak NG it bundles is not mapped (ESPEAK_IN_LOADER)" % d.version)
+        tag, commit = ESPEAK_IN_LOADER[d.version]
+        return [("eSpeak NG %s (libespeak-ng and espeak-ng-data)" % tag, "GPL-3.0-or-later",
+                 "https://github.com/espeak-ng/espeak-ng/archive/refs/tags/%s.tar.gz (the tag the loader's CI clones; built by "
+                 "https://github.com/thewh1teagle/espeakng-loader at %s: build.sh and .github/workflows/build.yml there, "
+                 "cmake -DBUILD_SHARED_LIBS=ON -DCOMPILE_INTONATIONS=OFF)" % (tag, commit))]
+    if key == "soundfile":
+        ver = None
+        for f in d.files or []:
+            s = str(f).replace("\\", "/")
+            if "_soundfile_data/" in s and "sndfile" in s.lower() and not s.endswith((".py", ".pyc", ".txt", ".md")):
+                try:
+                    m = re.search(rb"libsndfile-(\d+\.\d+\.\d+)", open(d.locate_file(f), "rb").read())
+                    if m:
+                        ver = m.group(1).decode(); break
+                except OSError:
+                    pass
+        if not ver:
+            raise SystemExit("FAIL soundfile %s: the bundled libsndfile's version could not be read" % d.version)
+        return [("libsndfile %s (the shared library in _soundfile_data/)" % ver, "LGPL-2.1-or-later",
+                 "https://github.com/libsndfile/libsndfile/releases/download/%s/libsndfile-%s.tar.xz (built by "
+                 "https://github.com/bastibe/libsndfile-binaries); a separate shared library you may replace with your own build" % (ver, ver))]
+    return {
+        "sounddevice": [("PortAudio (Windows: the DLL in _sounddevice_data/)", "MIT", "https://github.com/PortAudio/portaudio; licenses/PortAudio-LICENSE.txt")],
+        "pywhispercpp": [("whisper.cpp (compiled in)", "MIT", "https://github.com/ggml-org/whisper.cpp; licenses/whisper.cpp-LICENSE.txt")],
+        "llama-cpp-python": [("llama.cpp / ggml (compiled in)", "MIT", "https://github.com/ggml-org/llama.cpp; licenses/llama.cpp-LICENSE.txt")],
+    }.get(key, [])
 # packages whose wheel declares no licence, named from their own repository (checked by hand, 11-08)
 KNOWN = {
-    "espeakng-loader": "MIT (the loader's code, per https://github.com/thewh1teagle/espeakng-loader/blob/main/LICENSE; the wheel "
-                       "itself declares none) + eSpeak NG inside it, GPL-3.0-or-later (below)",
+    "espeakng-loader": "MIT (the loader's code, per its repository; the wheel itself declares none: licenses/espeakng-loader-LICENSE.txt) "
+                       "+ eSpeak NG inside it, GPL-3.0-or-later (below)",
 }
 COPYLEFT = re.compile(r"\b(A?GPL|LGPL|MPL|EPL|CDDL|GNU (Lesser |Library |Affero )?General Public)", re.I)
 LICENSE_FILE = re.compile(r"(^|/)(LICEN[CS]E|COPYING|NOTICE|AUTHORS|ThirdPartyNotices)[^/]*$", re.I)
@@ -43,13 +66,17 @@ def licence_of(d):
     if expr:
         return expr
     lic = (m.get("License") or "").strip()
+    if re.fullmatch(r"(unknown|none|n/?a|other|proprietary)( licen[cs]e)?", lic, re.I):   # (a placeholder is no licence: Haiku 11-08)
+        lic = ""
+    cls = [c.split("::")[-1].strip() for c in (m.get_all("Classifier") or []) if c.startswith("License ::")
+           and not re.search(r"OSI Approved$|Other/Proprietary", c)]
     if lic and len(lic) < 80 and "\n" not in lic:
         return lic
-    cls = [c.split("::")[-1].strip() for c in (m.get_all("Classifier") or []) if c.startswith("License ::")]
     if cls:
         return " / ".join(cls)
-    if lic:
-        return lic.splitlines()[0][:80]
+    if lic:                                                             # (a whole licence text in the field: name it by its first line)
+        first = lic.splitlines()[0].strip()
+        return first[:80] if re.search(r"\b(MIT|BSD|Apache|ISC|Mozilla|GNU|GPL|PSF|Python Software|Unlicense)\b", first, re.I) else ""
     return ""
 
 
@@ -70,6 +97,8 @@ def main():
     ap.add_argument("--tag", default="")
     ap.add_argument("--extra", action="append", default=[], help="NAME=one line, for parts that are not Python packages")
     ap.add_argument("--common", default="", help="a folder of licence texts copied whole into licenses/ (GPL-3.0, LGPL-2.1)")
+    ap.add_argument("--sources-attached", action="store_true",
+                    help="only when ci/fetch_copyleft_sources.py's output IS attached to the release named by --tag")
     ap.add_argument("sites", nargs="+")
     a = ap.parse_args()
     dists = {}
@@ -121,20 +150,23 @@ def main():
         rows.append((name, ver, lic or "UNNAMED", home, copied))
         if COPYLEFT.search(lic) and key not in KNOWN:                    # (a KNOWN package's copyleft part is its embedded entry)
             copyleft.append((name, ver, lic, "the package's own sdist on PyPI: https://pypi.org/project/%s/%s/#files" % (name, ver)))
-        for part, plic, src in EMBEDDED.get(key, []):
+        for part, plic, src in embedded(key, d):
             if COPYLEFT.search(plic):
                 copyleft.append(("%s, inside %s %s" % (part, name, ver), "", plic, src))
             rows.append(("  ↳ " + part, "", plic, src, []))
     lines = ["# Third-party notices", "",
              "This build of Glimmerveil Anchor is Apache-2.0 (see LICENSE). It also contains the open-source parts below, each under "
-             "its own licence, exactly as this build installed them%s. Every licence and notice file each part ships is in `licenses/`." %
+             "its own licence, exactly as this build installed them%s. The licence and notice files each part ships, and the "
+             "texts named below for parts whose packages carry none, are in `licenses/`." %
              (" (release %s)" % a.tag if a.tag else ""), ""]
     if copyleft:
         lines += ["## Copyleft parts (GPL / LGPL / MPL): their source", "",
-                  "These are free software under copyleft licences. They are included unmodified, as separate parts. You may get "
-                  "their complete source from the places named (the exact versions this build used)%s, and the copyleft licence "
-                  "texts are in `licenses/`. For a copy on request: glimmerveilAI@proton.me." %
-                  ("; a copy of each is also attached to https://github.com/glimmerveil/glimmerveil-anchor/releases/tag/%s" % a.tag if a.tag else ""), ""]
+                  "These are free software under copyleft licences, included as separate parts, as built by their upstream "
+                  "projects (named below); Glimmerveil changed nothing in them. You may get their complete source from the places "
+                  "named (the exact versions this build used)%s, and the copyleft licence texts are in `licenses/`. For a copy on "
+                  "request, for at least three years: glimmerveilAI@proton.me." %
+                  ("; a copy of each is also attached to https://github.com/glimmerveil/glimmerveil-anchor/releases/tag/%s" % a.tag
+                   if a.tag and a.sources_attached else ""), ""]
         for c in copyleft:
             name, ver, lic, src = (c[0], c[1], c[2], c[3])
             lines.append("- **%s%s**: %s. Source: %s" % (name, (" " + ver) if ver else "", lic, src))

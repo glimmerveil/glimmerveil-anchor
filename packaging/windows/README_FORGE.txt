@@ -27,4 +27,4 @@ BETA
 
 The software is Apache-2.0 (see LICENSE). The bundled model carries its own licence (brain\BRAIN.txt).
 The open-source parts it is built with, each under its own licence (some GPL/LGPL, with where to get their
-source), are listed in third-party\THIRD_PARTY_NOTICES.md, with every licence text beside it.
+source), are listed in third-party\THIRD_PARTY_NOTICES.md, with their licence texts in third-party\licenses\.
