@@ -55,11 +55,15 @@ for line in items:
                 raise RuntimeError("no sdist on PyPI")
             got.append(get(sd[0]["url"], os.path.join(out, sd[0]["filename"])))
         else:
-            um = re.search(r"https://\S+?\.(?:tar\.gz|tar\.xz|zip)", src)
-            if not um:
+            urls = re.findall(r"https://\S+?\.(?:tar\.gz|tar\.xz|zip)", src)   # (every archive the line names: the source and the scripts that built it)
+            if not urls:
                 raise RuntimeError("its line names no archive")
-            url = um.group(0)
-            got.append(get(url, os.path.join(out, url.rstrip("/").split("/")[-1] if "espeak-ng" not in url else "espeak-ng-" + url.split("/")[-1])))
+            for url in urls:
+                repo = re.match(r"https://github\.com/[^/]+/([^/]+)/archive/", url)
+                fname = url.rstrip("/").split("/")[-1]
+                if repo and not fname.startswith(repo.group(1)):
+                    fname = "%s-%s" % (repo.group(1), fname)               # (espeak-ng-1.52.0.tar.gz, espeakng-loader-<sha>.tar.gz)
+                got.append(get(url, os.path.join(out, fname)))
         print("ok  ", name)
     except Exception as e:                                             # noqa: BLE001
         bad.append("%s: %s" % (name, e)); print("FAIL", name, e)

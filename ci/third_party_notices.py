@@ -27,9 +27,9 @@ def embedded(key, d):
             raise SystemExit("FAIL espeakng-loader %s: which eSpeak NG it bundles is not mapped (ESPEAK_IN_LOADER)" % d.version)
         tag, commit = ESPEAK_IN_LOADER[d.version]
         return [("eSpeak NG %s (libespeak-ng and espeak-ng-data)" % tag, "GPL-3.0-or-later",
-                 "https://github.com/espeak-ng/espeak-ng/archive/refs/tags/%s.tar.gz (the tag the loader's CI clones; built by "
-                 "https://github.com/thewh1teagle/espeakng-loader at %s: build.sh and .github/workflows/build.yml there, "
-                 "cmake -DBUILD_SHARED_LIBS=ON -DCOMPILE_INTONATIONS=OFF)" % (tag, commit))]
+                 "https://github.com/espeak-ng/espeak-ng/archive/refs/tags/%s.tar.gz (the tag the loader's CI clones), and the scripts "
+                 "that built it: https://github.com/thewh1teagle/espeakng-loader/archive/%s.tar.gz (build.sh and "
+                 ".github/workflows/build.yml; cmake -DBUILD_SHARED_LIBS=ON -DCOMPILE_INTONATIONS=OFF)" % (tag, commit))]
     if key == "soundfile":
         ver = None
         for f in d.files or []:
