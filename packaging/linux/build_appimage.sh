@@ -60,6 +60,14 @@ echo "== [5/7] the two engines (CPU / Vulkan)"
 pip install -q --no-deps --target "$VEIL/lib-llama-cpu" "$WHEEL_CPU"
 pip install -q --no-deps --target "$VEIL/lib-llama-vulkan" "$WHEEL_VULKAN"
 
+echo "== [5b/7] third-party notices, read off what this build installed (Opus 11-08)"
+"$VEIL/python/bin/python3" "$REPO/ci/third_party_notices.py" --out "$VEIL/third-party" --tag "${ANCHOR_TAG:-}" \
+    --common "$REPO/packaging/licenses" \
+    --extra "Python (the bundled runtime, python/)=PSF-2.0, https://www.python.org/" \
+    --extra "Kokoro-82M v1.0 (the voice model, voice/kokoro-v1.0.onnx, voices-v1.0.bin)=Apache-2.0, https://huggingface.co/hexgrad/Kokoro-82M" \
+    --extra "Whisper base.en for whisper.cpp (the ear's model, voice/ggml-base.en.bin)=MIT, OpenAI; https://huggingface.co/ggerganov/whisper.cpp" \
+    "$VEIL/lib" "$VEIL/lib-llama-cpu"
+
 echo "== [6/7] voice, AppRun, desktop, icon"
 cp "$ART/voice/kokoro-v1.0.onnx" "$ART/voice/voices-v1.0.bin" "$ART/voice/ggml-base.en.bin" "$VEIL/voice/"
 cp "$HERE/AppRun" "$APPDIR/AppRun" && chmod +x "$APPDIR/AppRun"
