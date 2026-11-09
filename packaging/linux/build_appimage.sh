@@ -50,7 +50,8 @@ cp "$REPO/LICENSE" "$VEIL/licenses/"
 echo "== [4/7] python deps (manylinux wheels only)"
 WHEELHOUSE="$OUT/wheelhouse"
 mkdir -p "$WHEELHOUSE"
-DEPS=(kokoro-onnx soundfile sounddevice pywhispercpp numpy typing-extensions diskcache jinja2)
+# (soundfile and espeakng-loader bundle copyleft native code: PINNED to what the notices map, ci/third_party_notices.py, Opus 11-08)
+DEPS=(kokoro-onnx soundfile==0.14.0 espeakng-loader==0.2.4 sounddevice pywhispercpp numpy typing-extensions diskcache jinja2)
 pip download -q -d "$WHEELHOUSE" --only-binary=:all: \
     --platform manylinux_2_28_x86_64 --platform manylinux2014_x86_64 --platform none-any \
     --python-version 312 --implementation cp "${DEPS[@]}"

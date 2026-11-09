@@ -17,7 +17,9 @@ PY_URL = "https://www.python.org/ftp/python/%s/python-%s-embed-amd64.zip" % (PY_
 ENGINE = "llama-cpp-python==0.3.34"
 ENGINE_INDEX = "https://abetlen.github.io/llama-cpp-python/whl/cpu"
 VOICE = "--voice" in sys.argv or FORGE
-VOICE_PKGS = ["kokoro-onnx", "sounddevice", "soundfile", "pywhispercpp"]
+# (the two that bundle copyleft native code are PINNED to what 2.0.2 shipped and the notices map: ci/third_party_notices.py
+#  stops a build whose eSpeak NG or libsndfile it cannot name; move a pin only with its mapping and its source checked: Opus 11-08)
+VOICE_PKGS = ["kokoro-onnx", "sounddevice", "soundfile==0.14.0", "espeakng-loader==0.2.4", "pywhispercpp"]
 VOICE_FILES = [
     ("kokoro-v1.0.onnx", "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx"),
     ("voices-v1.0.bin", "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin"),
