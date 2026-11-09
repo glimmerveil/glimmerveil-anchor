@@ -97,6 +97,8 @@ def main():
     ap.add_argument("--tag", default="")
     ap.add_argument("--extra", action="append", default=[], help="NAME=one line, for parts that are not Python packages")
     ap.add_argument("--common", default="", help="a folder of licence texts copied whole into licenses/ (GPL-3.0, LGPL-2.1)")
+    ap.add_argument("--product", default="Glimmerveil Anchor")
+    ap.add_argument("--own", default="Apache-2.0 (see LICENSE)", help="the product's own licence, as one phrase")
     ap.add_argument("--sources-attached", action="store_true",
                     help="only when ci/fetch_copyleft_sources.py's output IS attached to the release named by --tag")
     ap.add_argument("sites", nargs="+")
@@ -155,7 +157,7 @@ def main():
                 copyleft.append(("%s, inside %s %s" % (part, name, ver), "", plic, src))
             rows.append(("  ↳ " + part, "", plic, src, []))
     lines = ["# Third-party notices", "",
-             "This build of Glimmerveil Anchor is Apache-2.0 (see LICENSE). It also contains the open-source parts below, each under "
+             "This build of %s is %s. It also contains the open-source parts below, each under " % (a.product, a.own) +
              "its own licence, exactly as this build installed them%s. The licence and notice files each part ships, and the "
              "texts named below for parts whose packages carry none, are in `licenses/`." %
              (" (release %s)" % a.tag if a.tag else ""), ""]
