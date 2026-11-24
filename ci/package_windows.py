@@ -18,7 +18,7 @@ ENGINE = "llama-cpp-python==0.3.34"
 ENGINE_INDEX = "https://abetlen.github.io/llama-cpp-python/whl/cpu"
 VOICE = "--voice" in sys.argv or FORGE
 # (the two that bundle copyleft native code are PINNED to what 2.0.2 shipped and the notices map: ci/third_party_notices.py
-#  stops a build whose eSpeak NG or libsndfile it cannot name; move a pin only with its mapping and its source checked: Opus 11-08)
+#  stops a build whose eSpeak NG or libsndfile it cannot name; move a pin only with its mapping and its source checked)
 VOICE_PKGS = ["kokoro-onnx", "sounddevice", "soundfile==0.14.0", "espeakng-loader==0.2.4", "pywhispercpp"]
 VOICE_FILES = [
     ("kokoro-v1.0.onnx", "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx"),
@@ -108,7 +108,7 @@ def main():
         shutil.copy2(os.path.join(win, "Anchor.bat"), ROOT)
         shutil.copy2(os.path.join(REPO, "packaging", "README_ANCHOR.txt"), os.path.join(ROOT, "README.txt"))
     shutil.copy2(os.path.join(REPO, "LICENSE"), ROOT)
-    # third-party notices, read off what THIS build installed (Opus 11-08: the voice builds carried GPL/LGPL code without its
+    # third-party notices, read off what THIS build installed (the voice builds carried GPL/LGPL code without its
     # licence text or a source pointer): third-party/THIRD_PARTY_NOTICES.md + every licence file, and the GPL/LGPL texts
     extras = ["Python %s (the embedded runtime, python/)=PSF-2.0, https://www.python.org/; licenses/Python-PSF-LICENSE.txt" % PY_VERSION]
     if VOICE:

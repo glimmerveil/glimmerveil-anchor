@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""THIRD-PARTY NOTICES for a build, from what the build actually installed (Opus 11-08: the voice builds of Anchor and the
+"""THIRD-PARTY NOTICES for a build, from what the build actually installed (the voice builds of Anchor and the
 Forge carried GPL/LGPL code without its licence text or source pointer; a hand-written list goes stale because the Windows
 build does not pin versions, so the notices are read off the build itself).
 
@@ -16,7 +16,7 @@ import shutil
 import sys
 
 # what some packages carry INSIDE them (native code built from another project), and its licence + exact source. Versioned:
-# a package version not mapped here, or a bundled library whose version cannot be read, STOPS the build (Haiku 11-08: notices
+# a package version not mapped here, or a bundled library whose version cannot be read, STOPS the build (notices
 # naming the wrong library version are worse than none; the Windows build does not pin its voice packages)
 ESPEAK_IN_LOADER = {"0.2.4": ("1.52.0", "146599e29be31bf17d99f0bcb7dbb2f92aef3d95")}   # loader version -> (eSpeak NG tag, loader commit)
 
@@ -66,7 +66,7 @@ def licence_of(d):
     if expr:
         return expr
     lic = (m.get("License") or "").strip()
-    if re.fullmatch(r"(unknown|none|n/?a|other|proprietary)( licen[cs]e)?", lic, re.I):   # (a placeholder is no licence: Haiku 11-08)
+    if re.fullmatch(r"(unknown|none|n/?a|other|proprietary)( licen[cs]e)?", lic, re.I):   # (a placeholder is no licence)
         lic = ""
     cls = [c.split("::")[-1].strip() for c in (m.get_all("Classifier") or []) if c.startswith("License ::")
            and not re.search(r"OSI Approved$|Other/Proprietary", c)]

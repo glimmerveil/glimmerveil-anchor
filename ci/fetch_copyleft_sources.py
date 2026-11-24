@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The source of every copyleft part a build ships, ready to attach to its GitHub release (Opus 11-08).
+"""The source of every copyleft part a build ships, ready to attach to its GitHub release.
 
     python ci/fetch_copyleft_sources.py <THIRD_PARTY_NOTICES.md> <out dir>
 
@@ -35,7 +35,7 @@ def get(url, dest):
         os.replace(dest + ".part", dest)
     finally:
         if os.path.exists(dest + ".part"):
-            os.remove(dest + ".part")                                  # (a failed download leaves nothing behind: Haiku 11-08)
+            os.remove(dest + ".part")                                  # (a failed download leaves nothing behind)
     return dest
 
 

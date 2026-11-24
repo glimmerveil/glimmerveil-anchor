@@ -50,7 +50,7 @@ cp "$REPO/LICENSE" "$VEIL/licenses/"
 echo "== [4/7] python deps (manylinux wheels only)"
 WHEELHOUSE="$OUT/wheelhouse"
 mkdir -p "$WHEELHOUSE"
-# (soundfile and espeakng-loader bundle copyleft native code: PINNED to what the notices map, ci/third_party_notices.py, Opus 11-08)
+# (soundfile and espeakng-loader bundle copyleft native code: PINNED to what the notices map, ci/third_party_notices.py)
 DEPS=(kokoro-onnx soundfile==0.14.0 espeakng-loader==0.2.4 sounddevice pywhispercpp numpy typing-extensions diskcache jinja2)
 pip download -q -d "$WHEELHOUSE" --only-binary=:all: \
     --platform manylinux_2_28_x86_64 --platform manylinux2014_x86_64 --platform none-any \
@@ -61,7 +61,7 @@ echo "== [5/7] the two engines (CPU / Vulkan)"
 pip install -q --no-deps --target "$VEIL/lib-llama-cpu" "$WHEEL_CPU"
 pip install -q --no-deps --target "$VEIL/lib-llama-vulkan" "$WHEEL_VULKAN"
 
-echo "== [5b/7] third-party notices, read off what this build installed (Opus 11-08)"
+echo "== [5b/7] third-party notices, read off what this build installed"
 "$VEIL/python/bin/python3" "$REPO/ci/third_party_notices.py" --out "$VEIL/third-party" --tag "${ANCHOR_TAG:-}" \
     --common "$REPO/packaging/licenses" \
     --extra "Python (the bundled runtime, python/)=PSF-2.0, https://www.python.org/; licenses/Python-PSF-LICENSE.txt" \
