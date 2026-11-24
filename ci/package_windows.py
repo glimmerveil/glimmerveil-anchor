@@ -17,7 +17,9 @@ PY_URL = "https://www.python.org/ftp/python/%s/python-%s-embed-amd64.zip" % (PY_
 ENGINE = "llama-cpp-python==0.3.34"
 ENGINE_INDEX = "https://abetlen.github.io/llama-cpp-python/whl/cpu"
 VOICE = "--voice" in sys.argv or FORGE
-VOICE_PKGS = ["kokoro-onnx", "sounddevice", "soundfile", "pywhispercpp"]
+# (the two that bundle copyleft native code are PINNED to what 2.0.2 shipped and the notices map: ci/third_party_notices.py
+#  stops a build whose eSpeak NG or libsndfile it cannot name; move a pin only with its mapping and its source checked)
+VOICE_PKGS = ["kokoro-onnx", "sounddevice", "soundfile==0.14.0", "espeakng-loader==0.2.4", "pywhispercpp"]
 VOICE_FILES = [
     ("kokoro-v1.0.onnx", "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx"),
     ("voices-v1.0.bin", "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin"),
@@ -106,6 +108,16 @@ def main():
         shutil.copy2(os.path.join(win, "Anchor.bat"), ROOT)
         shutil.copy2(os.path.join(REPO, "packaging", "README_ANCHOR.txt"), os.path.join(ROOT, "README.txt"))
     shutil.copy2(os.path.join(REPO, "LICENSE"), ROOT)
+    # third-party notices, read off what THIS build installed (the voice builds carried GPL/LGPL code without its
+    # licence text or a source pointer): third-party/THIRD_PARTY_NOTICES.md + every licence file, and the GPL/LGPL texts
+    extras = ["Python %s (the embedded runtime, python/)=PSF-2.0, https://www.python.org/; licenses/Python-PSF-LICENSE.txt" % PY_VERSION]
+    if VOICE:
+        extras += ["Kokoro-82M v1.0 (the voice model, voice/kokoro-v1.0.onnx, voices-v1.0.bin)=Apache-2.0, https://huggingface.co/hexgrad/Kokoro-82M; licenses/Apache-2.0.txt",
+                   "Whisper base.en for whisper.cpp (the ear's model, voice/ggml-base.en.bin)=MIT, OpenAI; https://huggingface.co/ggerganov/whisper.cpp; licenses/OpenAI-Whisper-LICENSE.txt"]
+    subprocess.check_call([sys.executable, os.path.join(REPO, "ci", "third_party_notices.py"), "--out", os.path.join(ROOT, "third-party"),
+                           "--tag", os.environ.get("GITHUB_REF_NAME", "") if os.environ.get("GITHUB_REF_TYPE") == "tag" else "",
+                           "--common", os.path.join(REPO, "packaging", "licenses")]
+                          + sum([["--extra", e] for e in extras], []) + [os.path.join(ROOT, "python", "Lib", "site-packages")])
     with open(os.path.join(ROOT, "models", "PUT_YOUR_GGUF_HERE.txt"), "w", encoding="utf-8") as f:
         f.write("Put a chat / instruct model (.gguf) in this folder, then run Anchor.bat (or pick one with [m]).\n")
 

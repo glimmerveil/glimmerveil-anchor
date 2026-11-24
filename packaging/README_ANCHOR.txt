@@ -153,4 +153,6 @@ THE SMALL PRINT
 ---------------
 Anchor is free and open source (Apache-2.0; see LICENSE). Everyone in her story is an adult — Anchor
 asks you to confirm that when you create her. The models you download carry their own licences.
+The open-source parts it is built with, each under its own licence (some GPL/LGPL, with where to get
+their source), are listed in third-party/THIRD_PARTY_NOTICES.md, with their licence texts in third-party/licenses/.
 Anchor collects nothing and sends nothing.

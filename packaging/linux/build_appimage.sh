@@ -50,7 +50,8 @@ cp "$REPO/LICENSE" "$VEIL/licenses/"
 echo "== [4/7] python deps (manylinux wheels only)"
 WHEELHOUSE="$OUT/wheelhouse"
 mkdir -p "$WHEELHOUSE"
-DEPS=(kokoro-onnx soundfile sounddevice pywhispercpp numpy typing-extensions diskcache jinja2)
+# (soundfile and espeakng-loader bundle copyleft native code: PINNED to what the notices map, ci/third_party_notices.py)
+DEPS=(kokoro-onnx soundfile==0.14.0 espeakng-loader==0.2.4 sounddevice pywhispercpp numpy typing-extensions diskcache jinja2)
 pip download -q -d "$WHEELHOUSE" --only-binary=:all: \
     --platform manylinux_2_28_x86_64 --platform manylinux2014_x86_64 --platform none-any \
     --python-version 312 --implementation cp "${DEPS[@]}"
@@ -59,6 +60,14 @@ pip install -q --no-index --find-links "$WHEELHOUSE" --target "$VEIL/lib" "${DEP
 echo "== [5/7] the two engines (CPU / Vulkan)"
 pip install -q --no-deps --target "$VEIL/lib-llama-cpu" "$WHEEL_CPU"
 pip install -q --no-deps --target "$VEIL/lib-llama-vulkan" "$WHEEL_VULKAN"
+
+echo "== [5b/7] third-party notices, read off what this build installed"
+"$VEIL/python/bin/python3" "$REPO/ci/third_party_notices.py" --out "$VEIL/third-party" --tag "${ANCHOR_TAG:-}" \
+    --common "$REPO/packaging/licenses" \
+    --extra "Python (the bundled runtime, python/)=PSF-2.0, https://www.python.org/; licenses/Python-PSF-LICENSE.txt" \
+    --extra "Kokoro-82M v1.0 (the voice model, voice/kokoro-v1.0.onnx, voices-v1.0.bin)=Apache-2.0, https://huggingface.co/hexgrad/Kokoro-82M; licenses/Apache-2.0.txt" \
+    --extra "Whisper base.en for whisper.cpp (the ear's model, voice/ggml-base.en.bin)=MIT, OpenAI; https://huggingface.co/ggerganov/whisper.cpp; licenses/OpenAI-Whisper-LICENSE.txt" \
+    "$VEIL/lib" "$VEIL/lib-llama-cpu" "$VEIL/lib-llama-vulkan"
 
 echo "== [6/7] voice, AppRun, desktop, icon"
 cp "$ART/voice/kokoro-v1.0.onnx" "$ART/voice/voices-v1.0.bin" "$ART/voice/ggml-base.en.bin" "$VEIL/voice/"
